@@ -12,22 +12,39 @@ object Db {
 
   /**
    * Iterator[ResultSet] which calls a function at end to close resources.
-   * 
-   * FIXME: semantics are wrong, since hasNext is side-effecting and next is not,
-   *        but maps directly onto ResultSet semantics. 
+   *
+   * This implementation addresses the mismatch between the semantics of Iterator
+   * and ResultSet (ResultSet.next() moves the cursor and indicates end in a
+   * single operation, whereas they are separate in Iterator).
    * @param rs ResultSet to iterate
    * @param onClose function to call at the end of the ResultSet.
    */
   class CloseableResultSetIterator(rs: ResultSet, onClose: () => Unit) extends Iterator[ResultSet] {
 
-    def hasNext: Boolean = {
-      val ret = rs.next()
-      if (!ret)
+    private[this] var _readPending = false
+    private[this] var _hasNext = false
+    private def _advance(): Unit = {
+      _hasNext = rs.next()
+      if (!_hasNext)
         close()
-      ret
     }
 
-    def next(): ResultSet = rs
+    def hasNext: Boolean = {
+      if (!_readPending) {
+        _readPending = true
+        _advance()
+      }
+      _hasNext
+    }
+
+    def next(): ResultSet = {
+      if (_readPending) {
+        _readPending = false
+      } else {
+        _advance()
+      }
+      rs
+    }
 
     def close(): Unit = {
       rs.close()
@@ -35,7 +52,7 @@ object Db {
     }
   }
 
-  class Closer(toClose: AutoCloseable*) extends Function0[Unit] {
+  private class Closer(toClose: AutoCloseable*) extends Function0[Unit] {
     def apply(): Unit = toClose.foreach(_.close())
   }
 
