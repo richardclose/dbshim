@@ -20,42 +20,50 @@ of the API, so method names and signatures will change.
 
 ## Examples
 
-    import org.phasanix.dbshim.JdbcBinder
-    import JdbcBinder.create
+```scala
+import org.phasanix.dbshim.JdbcBinder
+import JdbcBinder.create
 
-    //
-    // Corresponding table: 
-    // CREATE TABLE BICYCLE(make varchar(40) not null, weight double not null, groupset varchar(40) null);
-    //
-    case class Bicycle (make: String, weight: Double, groupset: Option[String])
-    
-    def loadBikes(implicit conn: Connection): Seq[Bicycle] = {
-      val stmt = conn.prepareStatement("select make, weight, groupset from BICYCLE")
-      val rs = stmt.executeQuery()
-      val binder = implicitly[JdbcBinder[Bicycle]]
-      val arr = collection.mutable.ArrayBuffer.empty[Bicycle]
-      while (rs.hasNext()) {
-        arr.append(binder.fromResultSet(rs))
-      }
-      stmt.close()
-      arr.toSeq
-    }
-    
-    def createBike(bike: Bicycle)(implicit conn: Connection): Bicycle = {
-      val stmt = conn.prepareStatement("insert into BICYCLE(make, weight, groupset) values(?,?,?)")
-      val binder = implicitly[JdbcBinder[Bicycle]]
-      binder.bindPreparedStatement(ps, bike)
-      stmt.execute()
-      stmt.close()
-    }
-    
-    def createBike(make: String, weight: Double, groupset: Option[String])(implicit conn: Connection): Bicycle = {
-      val stmt = conn.prepareStatement("insert into BICYCLE(make, weight, groupset) values(?,?,?)")
-      JdbcBinder.bindPreparedStatement(ps, (make, weight, groupset))
-      stmt.execute()
-      stmt.close()
-    }
+//
+// Corresponding table: 
+// CREATE TABLE BICYCLE(make varchar(40) not null, weight double not null, groupset varchar(40) null);
+//
+case class Bicycle (make: String, weight: Double, groupset: Option[String])
+
+def loadBikes(implicit conn: Connection): Seq[Bicycle] = {
+  val stmt = conn.prepareStatement("select make, weight, groupset from BICYCLE")
+  val rs = stmt.executeQuery()
+  val binder = implicitly[JdbcBinder[Bicycle]]
+  val arr = collection.mutable.ArrayBuffer.empty[Bicycle]
+  while (rs.hasNext()) {
+    arr.append(binder.fromResultSet(rs))
+  }
+  stmt.close()
+  arr.toSeq
+}
+
+def createBike(bike: Bicycle)(implicit conn: Connection): Bicycle = {
+  val stmt = conn.prepareStatement("insert into BICYCLE(make, weight, groupset) values(?,?,?)")
+  val binder = implicitly[JdbcBinder[Bicycle]]
+  binder.bindPreparedStatement(ps, bike)
+  stmt.execute()
+  stmt.close()
+}
+
+def createBike(make: String, weight: Double, groupset: Option[String])(implicit conn: Connection): Bicycle = {
+  val stmt = conn.prepareStatement("insert into BICYCLE(make, weight, groupset) values(?,?,?)")
+  JdbcBinder.bindPreparedStatement(ps, (make, weight, groupset))
+  stmt.execute()
+  stmt.close()
+}
+```
 
 Instances of `JdbcBinder[A]` are created a call to `JdbcBinder.create[A]`. This 
 is implicit, so in the above example two instances of `JdbcBinder[Bicycle]` are
 created by the calls to `implicitly`.
+
+## Utility methods
+Although it's not the focus of this library, there are some utility methods in `Db`, for 
+example an auto-closing `ResultSet` iterator. The plans are to stop short of creating
+yet another comprehensive data access wrapper, so the utility methods will work directly
+with JDBC classes without introducing new types or concepts.
