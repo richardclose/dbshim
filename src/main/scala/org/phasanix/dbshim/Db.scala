@@ -114,9 +114,9 @@ object Db {
    * @tparam A result type
    * @return result
    */
-  def withResultSet[A](sql: String, args: AnyRef*)(block: ResultSet => A)(implicit conn: Connection): A = {
+  def withResultSet[A](sql: String, args: Any*)(block: ResultSet => A)(implicit conn: Connection): A = {
     val stmt = conn.prepareStatement(sql)
-    args.zipWithIndex.foreach { case (arg, i) => stmt.setObject(i, arg) }
+    args.zipWithIndex.foreach { case (arg, i) => stmt.setObject(i, arg.asInstanceOf[AnyRef]) }
 
     try {
       block(stmt.executeQuery())
@@ -125,6 +125,24 @@ object Db {
     }
   }
 
+  /**
+    * Prepare and execute the given query, binding the arguments and passing the resultset
+    * to the given block once for the first result, or None if empty.
+    * @param sql sql query
+    * @param args arguments to bind
+    * @param block block to execute
+    * @param conn database connection
+    * @tparam A result type
+    * @return result
+    */
+  def withResultSetOpt[A](sql: String, args: Any*)(block: ResultSet => A)(implicit conn: Connection): Option[A] = {
+    withResultSet(sql, args) { rs =>
+      if (rs.next())
+        Some(block(rs))
+      else
+        None
+    }
+  }
 
   /**
    * Prepare and execute the given query, binding the arguments, and returning an auto-closing
@@ -135,15 +153,15 @@ object Db {
    * @param conn database connection
    * @return resultset iterator
    */
-  def autocloseQuery(sql: String, args: AnyRef*)(implicit conn: Connection): Iterator[ResultSet] = {
+  def autocloseQuery(sql: String, args: Any*)(implicit conn: Connection): Iterator[ResultSet] = {
     val stmt = conn.prepareStatement(sql)
-    args.zipWithIndex.foreach { case (arg, i) => stmt.setObject(i, arg) }
+    args.zipWithIndex.foreach { case (arg, i) => stmt.setObject(i+1, arg.asInstanceOf[AnyRef]) }
 
     val rs = stmt.executeQuery()
     new CloseableResultSetIterator(rs, new Closer(stmt, conn))
   }
 
-  /** Runtime type to sql type */
+    /** Runtime type to sql type */
   def sqlTypeOf[A : TypeTag]: Int = sqlTypeOf(typeOf[A])
 
   /** Runtime type to sql type */
