@@ -98,7 +98,7 @@ abstract class JdbcBinder[A] (val arity: Int, val fieldNames: Seq[String]) {
       endPos += 1
     }
     var pos = 1
-    for (i <- 0 until ret.length) {
+    for (i <- ret.indices) {
       if (ret(i) == 0) {
         ret(i) = pos
         pos += 1
@@ -165,6 +165,7 @@ object JdbcBinder {
         case x if x =:= typeOf[java.util.Date] => q"rs.getDate($indexExpr)"
         case x if x =:= typeOf[Boolean] => q"rs.getBoolean($indexExpr)"
         case x if x =:= typeOf[Long] => q"rs.getLong($indexExpr)"
+        case x if x =:= typeOf[Char] => q"rs.getString($indexExpr).headOption.getOrElse(' ')"
         case _ =>
           c.error(NoPosition, s"readRs: type not matched: $t")
           q"""Symbol("type not matched")""" // Trust that this will cause a compilation error
@@ -192,6 +193,7 @@ object JdbcBinder {
         case x if x =:= typeOf[String] => q"ps.setString($indexExpr, $propExpr)"
         case x if x =:= typeOf[java.util.Date] => q"ps.setDate($indexExpr, new java.sql.Date($propExpr.getTime()))"
         case x if x =:= typeOf[Boolean] => q"ps.setBoolean($indexExpr, $propExpr)"
+        case x if x =:= typeOf[Char] => q"ps.setString($indexExpr, java.lang.String.valueOf($propExpr))"
         case _ =>
           c.error(NoPosition, s"bindPs: type not matched: $t")
           q"42"
