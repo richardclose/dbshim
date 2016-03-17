@@ -30,6 +30,11 @@ import JdbcBinder.create
 //
 case class Bicycle (make: String, weight: Double, groupset: Option[String])
 
+object Bicycle {
+  def fixie(weight: Double): Bicycle = Bicycle("ACME", weight, None)
+
+}
+
 def loadBikes(implicit conn: Connection): Seq[Bicycle] = {
   val stmt = conn.prepareStatement("select make, weight, groupset from BICYCLE")
   val rs = stmt.executeQuery()
@@ -56,6 +61,19 @@ def createBike(make: String, weight: Double, groupset: Option[String])(implicit 
   stmt.execute()
   stmt.close()
 }
+
+def loadAsFixies(implicit conn: Connection): Seq[Bicycle] = {
+  val stmt = conn.prepareStatement("select weight from BICYCLE")
+  val rs = stmt.executeQuery()
+  val binder = JdbcBinder.function[Bicycle].create(Bicycle.fixie _)
+  val arr = collection.mutable.ArrayBuffer.empty[Bicycle]
+  while (rs.hasNext()) {
+    arr.append(binder.fromResultSet(rs))
+  }
+  stmt.close()
+  arr.toSeq
+}
+
 ```
 
 Instances of `JdbcBinder[A]` are created a call to `JdbcBinder.create[A]`. This 
