@@ -71,6 +71,25 @@ class BindResultSetTest extends FunSuite with ShouldMatchers {
       xs.head shouldBe 2
    }
   }
+
+  test("binder for factory function should work") {
+
+    def factoryFn(id: Int, name: String): BindResultSetTest.TestA = {
+      BindResultSetTest.TestA(id, name, "red", None)
+    }
+
+    DbFixture.withConnection { implicit  c =>
+
+      val binder: JdbcBinder[BindResultSetTest.TestA] = JdbcBinder.func[BindResultSetTest.TestA].create(factoryFn _)
+      val xs = Db.autocloseQuery("select id, name from TEST.A")
+        .map(binder.fromResultSet)
+        .toSeq
+
+      xs.length shouldBe 4
+      xs(3).name shouldBe "damson"
+      xs(3).colour shouldBe "red"
+    }
+  }
 }
 
 object BindResultSetTest {
