@@ -178,7 +178,7 @@ object JdbcBinder {
     }
 
     def bindPsExpr(t: Type, propExpr: c.Tree, indexExpr: c.Tree): c.Tree = {
-      // c.info(NoPosition, s"bindPsExpr($t)", force = true)
+      // c.info(NoPosition, s"bindPsExpr($t) index: $indexExpr", force = true)
       val ex1 = t match {
         case x if x <:< typeOf[Option[_]] =>
           val typeArg = (t match {case TypeRef(_, _, args) => args}).head
@@ -296,7 +296,7 @@ object JdbcBinder {
     }
 
     val bindExprs  = mkBindExprs { i: Int => q"offsets($i)" }
-    val bindExprsDirect = mkBindExprs { i: Int => Literal(Constant(i)) }
+    val bindExprsDirect = mkBindExprs { i: Int => Literal(Constant(i + 1)) }
 
     val fieldNames = ctorParamList.map(sym => sym.asTerm.name.toString)
     val fields = fieldNames.zip(argTypes).map(e => s"${e._1}: ${e._2.typeSymbol.fullName}").mkString(",")

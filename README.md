@@ -10,10 +10,16 @@ to what I needed, but too repetitive. Slick was too rigid for my use case
 (I felt I was fighting with path-dependent types all the time), and too
 much of a heavy framework.
 
-*DBShim* works with tuples and case classes. It uses macros to generate the 
-necessary calls to `ResultSet.getXxx` and `PreparedStatement.setXxx`, so it 
-should to be fast, though I haven't benchmarked yet. Nullable columns are 
-represented as `Option`s.
+*DBShim* works with tuples, case classes, and types returned from method calls.
+It uses macros to generate the necessary calls to `ResultSet.getXxx` and
+`PreparedStatement.setXxx`, so it should to be fast, though I haven't benchmarked
+yet. Nullable columns are represented as `Option`s.
+
+Instances of `JdbcBinder` are created for tuples and case classes by `JdbcBinder.create[A]`.
+Create a `JdbcBinder` for a factory method like this:
+`val binder: JdbcBinder[MyType] = JdbcBinder.func[MyType].create(makeMyType _)
+`. It is necessary to convert the method to a function, as shown, so that the macro
+has a type to work with.
 
 This version is a first cut -- there is a lot of work to be done on the ergonomics
 of the API, so method names and signatures will change.
@@ -26,17 +32,16 @@ import JdbcBinder.create
 
 //
 // Corresponding table: 
-// CREATE TABLE BICYCLE(make varchar(40) not null, weight double not null, groupset varchar(40) null);
+// CREATE TABLE BICYCLE(id: bigint identity, make varchar(40) not null, weight double not null, groupset varchar(40) null);
 //
-case class Bicycle (make: String, weight: Double, groupset: Option[String])
+case class Bicycle (id: Long, make: String, weight: Double, groupset: Option[String])
 
 object Bicycle {
-  def fixie(weight: Double): Bicycle = Bicycle("ACME", weight, None)
-
+  def fixie(id: Long, weight: Double): Bicycle = Bicycle(id, "ACME", weight, None)
 }
 
 def loadBikes(implicit conn: Connection): Seq[Bicycle] = {
-  val stmt = conn.prepareStatement("select make, weight, groupset from BICYCLE")
+  val stmt = conn.prepareStatement("select id, make, weight, groupset from BICYCLE")
   val rs = stmt.executeQuery()
   val binder = implicitly[JdbcBinder[Bicycle]]
   val arr = collection.mutable.ArrayBuffer.empty[Bicycle]
@@ -63,7 +68,7 @@ def createBike(make: String, weight: Double, groupset: Option[String])(implicit 
 }
 
 def loadAsFixies(implicit conn: Connection): Seq[Bicycle] = {
-  val stmt = conn.prepareStatement("select weight from BICYCLE")
+  val stmt = conn.prepareStatement("select id, weight from BICYCLE")
   val rs = stmt.executeQuery()
   val binder = JdbcBinder.function[Bicycle].create(Bicycle.fixie _)
   val arr = collection.mutable.ArrayBuffer.empty[Bicycle]
