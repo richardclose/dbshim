@@ -67,6 +67,14 @@ object DbFixture {
         |
         |insert into A values (1,'apple','red',2.0),(2,'banana','yellow',null),(3,'cherry','red',1.5),(4,'damson','purple',null);
         |
+        |create table B (
+        |  id bigint primary key
+        |, name varchar(20) not null
+        |, when datetime not null
+        |);
+        |
+        |insert into B values (1, 'bob', '2016-01-01'), (2, 'fred', '2016-01-02'), (3, 'george', '2016-01-03');
+        |
       """.stripMargin
 
     val is = new ByteArrayInputStream(sql.getBytes)

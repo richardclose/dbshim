@@ -78,4 +78,28 @@ class DbTest extends FunSuite with ShouldMatchers {
     it.hasNext shouldBe false
     conn.isClosed shouldBe true
   }
+
+  test("withResultSetOpt should product Some for existing row") {
+
+    val x: Option[(Long, String)] = DbFixture.withConnection { implicit c =>
+
+      Db.withResultSetOpt("select * from TEST.B where id=?", 1) { rs =>
+        (rs.getLong(1), rs.getString(2))
+      }
+    }
+
+    x.isDefined shouldBe true
+  }
+
+  test("withResultSetOpt should product None for non-existent row") {
+
+    val x: Option[(Long, String)] = DbFixture.withConnection { implicit c =>
+
+      Db.withResultSetOpt("select * from TEST.B where id=?", -1) { rs =>
+        (rs.getLong(1), rs.getString(2))
+      }
+    }
+
+    x.isDefined shouldBe false
+  }
 }

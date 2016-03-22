@@ -116,7 +116,7 @@ object Db {
    */
   def withResultSet[A](sql: String, args: Any*)(block: ResultSet => A)(implicit conn: Connection): A = {
     val stmt = conn.prepareStatement(sql)
-    args.zipWithIndex.foreach { case (arg, i) => stmt.setObject(i, arg.asInstanceOf[AnyRef]) }
+    args.zipWithIndex.foreach { case (arg, i) => stmt.setObject(i + 1, arg.asInstanceOf[AnyRef]) }
 
     try {
       block(stmt.executeQuery())
@@ -136,7 +136,7 @@ object Db {
     * @return result
     */
   def withResultSetOpt[A](sql: String, args: Any*)(block: ResultSet => A)(implicit conn: Connection): Option[A] = {
-    withResultSet(sql, args) { rs =>
+    withResultSet(sql, args: _*) { rs =>
       if (rs.next())
         Some(block(rs))
       else
@@ -161,6 +161,20 @@ object Db {
     new CloseableResultSetIterator(rs, new Closer(stmt, conn))
   }
 
+  /**
+    * Scalar result from a ResultSet, i.e. the value in the first column
+    * of the first row.
+    * @param rs ResultSet
+    * @tparam A required return type
+    */
+  def resultSetScalar[A : ReadRs](rs: ResultSet): Option[A] = {
+    if (rs.next()) {
+      Some(implicitly[ReadRs[A]].read(rs, 1))
+    } else {
+      None
+    }
+  }
+
     /** Runtime type to sql type */
   def sqlTypeOf[A : TypeTag]: Int = sqlTypeOf(typeOf[A])
 
@@ -180,6 +194,4 @@ object Db {
       case _ => T.JAVA_OBJECT
     }
   }
-
-
 }
