@@ -22,7 +22,8 @@ Create a `JdbcBinder` for a factory method like this:
 has a type to work with.
 
 This version is a first cut -- there is a lot of work to be done on the ergonomics
-of the API, so method names and signatures will change.
+of the API, so method names and signatures will change. Java 8 is required, as conversion
+to `java.time.{LocalDate,LocalDateTime}` is implemented.
 
 ## Examples
 

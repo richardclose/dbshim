@@ -71,9 +71,13 @@ object DbFixture {
         |  id bigint primary key
         |, name varchar(20) not null
         |, when datetime not null
+        |, the_date date not null
         |);
         |
-        |insert into B values (1, 'bob', '2016-01-01'), (2, 'fred', '2016-01-02'), (3, 'george', '2016-01-03');
+        |insert into B values
+        |  (1, 'bob',    '2016-01-01', '2014-02-02')
+        |, (2, 'fred',   '2016-01-02', '2014-03-11')
+        |, (3, 'george', '2016-01-03', '2014-04-15');
         |
       """.stripMargin
 

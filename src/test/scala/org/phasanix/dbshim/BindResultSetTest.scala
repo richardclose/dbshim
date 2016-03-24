@@ -27,8 +27,6 @@ SOFTWARE.
 
 package org.phasanix.dbshim
 
-import java.sql.Connection
-
 import org.scalatest.{ShouldMatchers, FunSuite}
 
 class BindResultSetTest extends FunSuite with ShouldMatchers {
@@ -83,16 +81,32 @@ class BindResultSetTest extends FunSuite with ShouldMatchers {
       val binder: JdbcBinder[BindResultSetTest.TestA] = JdbcBinder.func[BindResultSetTest.TestA].create(factoryFn _)
       val xs = Db.autocloseQuery("select id, name from TEST.A")
         .map(binder.fromResultSet)
-        .toSeq
+        .toIndexedSeq
 
       xs.length shouldBe 4
       xs(3).name shouldBe "damson"
       xs(3).colour shouldBe "red"
     }
   }
+
+  test("date conversions should work") {
+    val binder: JdbcBinder[BindResultSetTest.TestB] = implicitly[JdbcBinder[BindResultSetTest.TestB]]
+
+    val xs = DbFixture.withConnection { implicit c =>
+      Db.autocloseQuery("select * from TEST.B")
+        .map(binder.fromResultSet)
+        .toIndexedSeq
+    }
+
+    xs.length shouldBe 3
+    xs(0).toString shouldBe "TestB(1,bob,2016-01-01,2014-02-02)"
+    xs(1).toString shouldBe "TestB(2,fred,2016-01-02,2014-03-11)"
+    xs(2).toString shouldBe "TestB(3,george,2016-01-03,2014-04-15)"
+  }
 }
 
 object BindResultSetTest {
   case class TestA(id: Int, name: String, colour: String, weight: Option[Double])
+  case class TestB(id: Long, name: String, when: java.util.Date, theDate: java.time.LocalDate)
 }
 

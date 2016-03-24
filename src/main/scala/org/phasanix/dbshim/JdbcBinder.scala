@@ -27,6 +27,9 @@ SOFTWARE.
 package org.phasanix.dbshim
 
 import java.sql.{PreparedStatement, ResultSet}
+import java.sql.{Date => SqlDate}
+import java.util.{Date => JUDate}
+import java.time._
 
 /**
  * Interface for creating instances from jdbc resultsets, and binding instances to prepared statements.
@@ -129,6 +132,49 @@ abstract class JdbcBinder[A] (val arity: Int, val fieldNames: Seq[String]) {
       }
     }
   }
+
+  protected val driverImplementsJdbc42: Boolean = false
+  protected val zoneId: ZoneId = ZoneId.systemDefault() // Used for converting to/from LocalDate[Time]
+
+  // Get a DATE value as a java.time.LocalDate, called from generated code.
+  protected def getLocalDate(rs: ResultSet, columnIndex: Int): LocalDate = {
+    var d: LocalDate = if (driverImplementsJdbc42) {
+      rs.getObject(columnIndex, classOf[LocalDate])
+    } else {
+      null
+    }
+    if (d == null)
+      d = rs.getDate(columnIndex).toLocalDate
+    d
+  }
+
+  //  Get a TIMESTAMP value, called from generated code. Makes the assumption
+  //  that the date is in the system timezone.
+  protected def getLocalDateTime(rs: ResultSet, columnIndex: Int): LocalDateTime = {
+    var d: LocalDateTime = if (driverImplementsJdbc42) {
+      rs.getObject(columnIndex, classOf[LocalDateTime])
+    } else {
+      null
+    }
+    if (d == null) {
+      val date = rs.getDate(columnIndex)
+      d = ZonedDateTime.ofInstant(Instant.ofEpochMilli(date.getTime), zoneId).toLocalDateTime
+    }
+    d
+  }
+
+  protected def setLocalDateTime(ps: PreparedStatement, parameterIndex: Int, value: LocalDateTime): Unit = {
+    val instant = ZonedDateTime.of(value, zoneId).toInstant
+    val date = new SqlDate(instant.toEpochMilli)
+    ps.setDate(parameterIndex, date)
+  }
+
+  protected def setLocalDate(ps: PreparedStatement, parameterIndex: Int, value: LocalDate): Unit = {
+    val instant = value.atStartOfDay(zoneId).toInstant
+    val date = new SqlDate(instant.toEpochMilli)
+    ps.setDate(parameterIndex, date)
+  }
+
 }
 
 object JdbcBinder {
@@ -152,7 +198,10 @@ object JdbcBinder {
         case x if x =:= typeOf[Long] => T.BIGINT
         case x if x =:= typeOf[Float] => T.FLOAT
         case x if x =:= typeOf[Double] => T.DOUBLE
-        case x if x =:= typeOf[java.util.Date] => T.TIMESTAMP
+        case x if x =:= typeOf[SqlDate] => T.DATE
+        case x if x =:= typeOf[LocalDate] => T.DATE
+        case x if x =:= typeOf[JUDate] => T.TIMESTAMP
+        case x if x =:= typeOf[LocalDateTime] => T.TIMESTAMP
         case x if x =:= typeOf[String] => T.VARCHAR
         case x if x =:= typeOf[Boolean] => T.BOOLEAN
 
@@ -167,7 +216,9 @@ object JdbcBinder {
         case x if x =:= typeOf[Float] => q"rs.getFloat($indexExpr)"
         case x if x =:= typeOf[Double] => q"rs.getDouble($indexExpr)"
         case x if x =:= typeOf[String] => q"rs.getString($indexExpr)"
-        case x if x =:= typeOf[java.util.Date] => q"rs.getDate($indexExpr)"
+        case x if x =:= typeOf[JUDate] => q"rs.getDate($indexExpr)"
+        case x if x =:= typeOf[LocalDate] => q"getLocalDate(rs, $indexExpr)"
+        case x if x =:= typeOf[LocalDateTime] => q"getLocalDateTime(rs, $indexExpr)"
         case x if x =:= typeOf[Boolean] => q"rs.getBoolean($indexExpr)"
         case x if x =:= typeOf[Long] => q"rs.getLong($indexExpr)"
         case x if x =:= typeOf[Char] => q"rs.getString($indexExpr).headOption.getOrElse(' ')"
@@ -196,7 +247,9 @@ object JdbcBinder {
         case x if x =:= typeOf[Float] => q"ps.setFloat($indexExpr, $propExpr)"
         case x if x =:= typeOf[Double] => q"ps.setDouble($indexExpr, $propExpr)"
         case x if x =:= typeOf[String] => q"ps.setString($indexExpr, $propExpr)"
-        case x if x =:= typeOf[java.util.Date] => q"ps.setDate($indexExpr, new java.sql.Date($propExpr.getTime()))"
+        case x if x =:= typeOf[JUDate] => q"ps.setDate($indexExpr, new java.sql.Date($propExpr.getTime()))"
+        case x if x =:= typeOf[LocalDate] => q"setLocalDate(ps, $indexExpr, $propExpr)"
+        case x if x =:= typeOf[LocalDateTime] => q"setLocalDateTime(ps, $indexExpr, $propExpr)"
         case x if x =:= typeOf[Boolean] => q"ps.setBoolean($indexExpr, $propExpr)"
         case x if x =:= typeOf[Char] => q"ps.setString($indexExpr, java.lang.String.valueOf($propExpr))"
         case _ =>
@@ -332,6 +385,7 @@ object JdbcBinder {
     * <code>
     *   val binder: JdbcBinder[MyType] = JdbcBinder.func[MyType].create(myFunction _)
     * </code>
+    *
     * @tparam A type created by bound function
     */
   def func[A] = new FnBind[A]()
