@@ -45,13 +45,30 @@ import java.time._
  * and so on). The values of <code>offsets</code> are the <code>columnIndex</code>s of a
  * <code>ResultSet</code>, or the <code>parameterIndex</code>s of a <code>PreparedStatement</code>.
  */
-abstract class JdbcBinder[A] (val arity: Int, val fieldNames: Seq[String]) {
+abstract class JdbcBinder[A] (val arity: Int, val fieldNames: Seq[String]) extends Cloneable {
+
+  protected var _zoneId: ZoneId = ZoneId.systemDefault()
+
+  /**
+    * Clone this with different zone id.
+    */
+  def withZoneId(zoneId: ZoneId): JdbcBinder[A] = {
+    val ret = clone().asInstanceOf[JdbcBinder[A]]
+    ret._zoneId = zoneId
+    ret
+  }
+
+  /**
+    * Time zone to use for date conversions
+    * @return
+    */
+  def zoneId: ZoneId = _zoneId
 
   /**
    * Create an instance of A from the current row of the resultset.
-    *
-    * @param offsets map from element of A to resultset parameter index.
-   */
+   *
+   * @param offsets map from element of A to resultset parameter index.
+  */
   def fromResultSetMapped(rs: ResultSet, offsets: IndexedSeq[Int]): A
 
   /**
@@ -62,8 +79,8 @@ abstract class JdbcBinder[A] (val arity: Int, val fieldNames: Seq[String]) {
 
   /**
    * Bind elements of value (in order) to the prepared statement.
-    *
-    * @param offsets map from element of A to parameterIndex of prepared statement.
+   *
+   * @param offsets map from element of A to parameterIndex of prepared statement.
    *                A value of 0 means "don't bind".
    */
   def bindPreparedStatement(ps: PreparedStatement, value: A, offsets: IndexedSeq[Int]): Unit
@@ -134,7 +151,6 @@ abstract class JdbcBinder[A] (val arity: Int, val fieldNames: Seq[String]) {
   }
 
   protected val driverImplementsJdbc42: Boolean = false
-  protected val zoneId: ZoneId = ZoneId.systemDefault() // Used for converting to/from LocalDate[Time]
 
   // Get a DATE value as a java.time.LocalDate, called from generated code.
   protected def getLocalDate(rs: ResultSet, columnIndex: Int): LocalDate = {
