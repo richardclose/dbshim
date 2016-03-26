@@ -42,7 +42,8 @@ object Db {
    * This implementation addresses the mismatch between the semantics of Iterator
    * and ResultSet (ResultSet.next() moves the cursor and indicates end in a
    * single operation, whereas they are separate in Iterator).
-   * @param rs ResultSet to iterate
+    *
+    * @param rs ResultSet to iterate
    * @param onClose function to call at the end of the ResultSet.
    */
   class CloseableResultSetIterator(rs: ResultSet, onClose: () => Unit) extends Iterator[ResultSet] {
@@ -91,7 +92,8 @@ object Db {
 
   /**
    * Invoke the given PreparedStatement, then close it.
-   * @param stmt prepared statement to invoke
+    *
+    * @param stmt prepared statement to invoke
    * @param block block to execute.
    * @tparam A result type
    * @return result
@@ -107,7 +109,8 @@ object Db {
   /**
    * Prepare and execute the given query, binding the arguments and passing the resultset
    * to the given block.
-   * @param sql sql query
+    *
+    * @param sql sql query
    * @param args arguments to bind
    * @param block block to execute
    * @param conn database connection
@@ -128,6 +131,7 @@ object Db {
   /**
     * Prepare and execute the given query, binding the arguments and passing the resultset
     * to the given block once for the first result, or None if empty.
+    *
     * @param sql sql query
     * @param args arguments to bind
     * @param block block to execute
@@ -148,7 +152,8 @@ object Db {
    * Prepare and execute the given query, binding the arguments, and returning an auto-closing
    * iterator for the resultset. The <code>Connection</code> is also closed, on the assumption
    * that it belongs to a connection pool.
-   * @param sql sql query
+    *
+    * @param sql sql query
    * @param args arguments to bind
    * @param conn database connection
    * @return resultset iterator
@@ -164,6 +169,7 @@ object Db {
   /**
     * Scalar result from a ResultSet, i.e. the value in the first column
     * of the first row.
+    *
     * @param rs ResultSet
     * @tparam A required return type
     */
@@ -173,6 +179,24 @@ object Db {
     } else {
       None
     }
+  }
+
+  /**
+    * Evaluate given resultset, giving sequence of required type
+    * @param rs resultset
+    * @param fn function that creates instances of required type from resultset
+    * @tparam A required type
+    * @return non-lazy sequence of required type.
+    */
+  def resultSetVector[A](rs: ResultSet)(fn: ResultSet => A): Seq[A] = {
+    val ret = collection.mutable.ArrayBuffer.empty[A]
+    try {
+      while (rs.next())
+        ret.append(fn(rs))
+    } finally {
+      rs.close()
+    }
+    ret.toSeq
   }
 
     /** Runtime type to sql type */

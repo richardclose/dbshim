@@ -102,4 +102,16 @@ class DbTest extends FunSuite with ShouldMatchers {
 
     x.isDefined shouldBe false
   }
+
+  test("resultsetVector should work") {
+    val xs = DbFixture.withConnection { implicit c =>
+      Db.withResultSet("select * from TEST.B") { rs =>
+        Db.resultSetVector(rs)(rs => rs.getInt(1) -> rs.getString(2))
+      }
+    }
+
+    xs(2).toString() shouldBe "(3,george)"
+    xs.length shouldBe 3
+  }
+
 }
