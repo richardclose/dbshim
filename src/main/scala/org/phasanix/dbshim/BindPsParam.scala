@@ -32,25 +32,25 @@ import java.util.Date
 /**
  * Runtime binding -- work in progress
  */
-trait PreparedStatementBinder[A] {
+trait BindPsParam[A] {
   def bind(ps: PreparedStatement, index: Int, value: A): Unit
 }
 
-object PreparedStatementBinder {
+object BindPsParam {
 
   import reflect.runtime.{universe => u}
 
-  implicit val bindInt = new PreparedStatementBinder[Int] { def bind(ps: PreparedStatement, index: Int, value: Int): Unit = { ps.setInt(index, value)} }
-  implicit val bindLong = new PreparedStatementBinder[Long] { def bind(ps: PreparedStatement, index: Int, value: Long): Unit = { ps.setLong(index, value)} }
-  implicit val bindFloat = new PreparedStatementBinder[Float] { def bind(ps: PreparedStatement, index: Int, value: Float): Unit = { ps.setFloat(index, value)} }
-  implicit val bindDouble = new PreparedStatementBinder[Double] { def bind(ps: PreparedStatement, index: Int, value: Double): Unit = { ps.setDouble(index, value)} }
-  implicit val bindString = new PreparedStatementBinder[String] { def bind(ps: PreparedStatement, index: Int, value: String): Unit = { ps.setString(index, value)} }
-  implicit val bindDate = new PreparedStatementBinder[Date] { def bind(ps: PreparedStatement, index: Int, value: Date): Unit = { ps.setDate(index, new java.sql.Date(value.getTime))} }
+  implicit val bindInt = new BindPsParam[Int] { def bind(ps: PreparedStatement, index: Int, value: Int): Unit = { ps.setInt(index, value)} }
+  implicit val bindLong = new BindPsParam[Long] { def bind(ps: PreparedStatement, index: Int, value: Long): Unit = { ps.setLong(index, value)} }
+  implicit val bindFloat = new BindPsParam[Float] { def bind(ps: PreparedStatement, index: Int, value: Float): Unit = { ps.setFloat(index, value)} }
+  implicit val bindDouble = new BindPsParam[Double] { def bind(ps: PreparedStatement, index: Int, value: Double): Unit = { ps.setDouble(index, value)} }
+  implicit val bindString = new BindPsParam[String] { def bind(ps: PreparedStatement, index: Int, value: String): Unit = { ps.setString(index, value)} }
+  implicit val bindDate = new BindPsParam[Date] { def bind(ps: PreparedStatement, index: Int, value: Date): Unit = { ps.setDate(index, new java.sql.Date(value.getTime))} }
 
-  def mkBindOpt[A : PreparedStatementBinder : u.TypeTag] = new PreparedStatementBinder[Option[A]] {
+  def mkBindOpt[A : BindPsParam : u.TypeTag] = new BindPsParam[Option[A]] {
     def bind(ps: PreparedStatement, index: Int, value: Option[A]): Unit = {
       value match {
-        case Some(x) => implicitly[PreparedStatementBinder[A]].bind(ps, index, x)
+        case Some(x) => implicitly[BindPsParam[A]].bind(ps, index, x)
         case None => ps.setNull(index, Db.sqlTypeOf[A])
       }
     }
