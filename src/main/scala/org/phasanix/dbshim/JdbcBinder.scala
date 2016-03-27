@@ -27,9 +27,8 @@ SOFTWARE.
 package org.phasanix.dbshim
 
 import java.sql.{PreparedStatement, ResultSet}
-import java.sql.{Date => SqlDate}
-import java.util.{Date => JUDate}
 import java.time._
+import java.util.{Date => JUDate}
 
 /**
  * Interface for creating instances from jdbc resultsets, and binding instances to prepared statements.
@@ -45,9 +44,15 @@ import java.time._
  * and so on). The values of <code>offsets</code> are the <code>columnIndex</code>s of a
  * <code>ResultSet</code>, or the <code>parameterIndex</code>s of a <code>PreparedStatement</code>.
  */
-abstract class JdbcBinder[A] (val arity: Int, val fieldNames: Seq[String]) extends Cloneable {
+abstract class JdbcBinder[A] (val arity: Int, val fieldNames: Seq[String]) extends Jsr310Support with Cloneable {
 
   protected var _zoneId: ZoneId = ZoneId.systemDefault()
+
+  /**
+    * In future, this will be determined by somehow querying or testing the
+    * driver.
+    */
+  val driverImplementsJdbc42: Boolean = false
 
   /**
     * Clone this with different zone id.
@@ -150,46 +155,6 @@ abstract class JdbcBinder[A] (val arity: Int, val fieldNames: Seq[String]) exten
     }
   }
 
-  protected val driverImplementsJdbc42: Boolean = false
-
-  // Get a DATE value as a java.time.LocalDate, called from generated code.
-  protected def getLocalDate(rs: ResultSet, columnIndex: Int): LocalDate = {
-    var d: LocalDate = if (driverImplementsJdbc42) {
-      rs.getObject(columnIndex, classOf[LocalDate])
-    } else {
-      null
-    }
-    if (d == null)
-      d = rs.getDate(columnIndex).toLocalDate
-    d
-  }
-
-  //  Get a TIMESTAMP value, called from generated code. Makes the assumption
-  //  that the date is in the system timezone.
-  protected def getLocalDateTime(rs: ResultSet, columnIndex: Int): LocalDateTime = {
-    var d: LocalDateTime = if (driverImplementsJdbc42) {
-      rs.getObject(columnIndex, classOf[LocalDateTime])
-    } else {
-      null
-    }
-    if (d == null) {
-      val date = rs.getDate(columnIndex)
-      d = ZonedDateTime.ofInstant(Instant.ofEpochMilli(date.getTime), zoneId).toLocalDateTime
-    }
-    d
-  }
-
-  protected def setLocalDateTime(ps: PreparedStatement, parameterIndex: Int, value: LocalDateTime): Unit = {
-    val instant = ZonedDateTime.of(value, zoneId).toInstant
-    val date = new SqlDate(instant.toEpochMilli)
-    ps.setDate(parameterIndex, date)
-  }
-
-  protected def setLocalDate(ps: PreparedStatement, parameterIndex: Int, value: LocalDate): Unit = {
-    val instant = value.atStartOfDay(zoneId).toInstant
-    val date = new SqlDate(instant.toEpochMilli)
-    ps.setDate(parameterIndex, date)
-  }
 
 }
 
