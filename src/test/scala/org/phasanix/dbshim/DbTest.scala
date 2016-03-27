@@ -27,6 +27,8 @@ SOFTWARE.
 package org.phasanix.dbshim
 
 import java.sql.ResultSet
+import java.util.{Date => JuDate}
+import java.time.LocalDate
 
 import org.scalatest.{ShouldMatchers, FunSuite}
 
@@ -105,13 +107,33 @@ class DbTest extends FunSuite with ShouldMatchers {
 
   test("resultsetVector should work") {
     val xs = DbFixture.withConnection { implicit c =>
-      Db.withResultSet("select * from TEST.B") { rs =>
+      Db.withResultSet("select * from TEST.B where id < 10 order by id") { rs =>
         Db.resultSetVector(rs)(rs => rs.getInt(1) -> rs.getString(2))
       }
     }
 
     xs(2).toString() shouldBe "(3,george)"
     xs.length shouldBe 3
+  }
+
+  test("bind prepared statement for update and query should work") {
+
+    val maybeId = DbFixture.withConnection { implicit c =>
+      Db.prepare("insert into TEST.B values (?,?,?,?)")
+        .set(100L)
+        .set("albert")
+        .set(new JuDate())
+        .set(LocalDate.now())
+        .update()
+
+      val rs = Db.prepare("select * from TEST.B where id=?")
+        .set(100L)
+        .query()
+
+      Db.resultSetScalar[Long](rs)
+    }
+
+    maybeId.contains(100L) shouldBe true
   }
 
 }

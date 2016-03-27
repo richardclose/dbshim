@@ -27,6 +27,7 @@ SOFTWARE.
 package org.phasanix.dbshim
 
 import java.sql.{PreparedStatement, Connection, ResultSet}
+import java.sql.{Date => SqlDate}
 
 import reflect.runtime.universe._
 
@@ -182,6 +183,17 @@ object Db {
   }
 
   /**
+    * Converted row from a ResultSet, or None if the ResultSet is
+    * empty.
+    */
+  def resultSetOpt[A](rs: ResultSet)(fn: ResultSet => A): Option[A] = {
+    if (rs.next())
+      Some(fn(rs))
+    else
+      None
+  }
+
+  /**
     * Evaluate given resultset, giving sequence of required type
     * @param rs resultset
     * @param fn function that creates instances of required type from resultset
@@ -196,7 +208,21 @@ object Db {
     } finally {
       rs.close()
     }
-    ret.toSeq
+    ret
+  }
+
+  /**
+    * Create PreparedStatement for given sql, wrapped in PreparedStatementBinder
+    */
+  def prepare(sql: String)(implicit conn: Connection): PreparedStatementBinder = {
+    new PreparedStatementBinder(conn.prepareStatement(sql))
+  }
+
+  /**
+    * Wrap given PreparedStatement in PreparedStatementBinder
+    */
+  def bindPs(ps: PreparedStatement): PreparedStatementBinder = {
+    new PreparedStatementBinder(ps)
   }
 
     /** Runtime type to sql type */

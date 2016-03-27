@@ -29,6 +29,7 @@ package org.phasanix.dbshim
 import java.sql.{PreparedStatement, ResultSet}
 import java.time._
 import java.util.{Date => JUDate}
+import java.sql.{Date => SqlDate}
 
 /**
  * Interface for creating instances from jdbc resultsets, and binding instances to prepared statements.
