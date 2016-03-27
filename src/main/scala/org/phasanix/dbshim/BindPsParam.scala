@@ -27,7 +27,8 @@ SOFTWARE.
 package org.phasanix.dbshim
 
 import java.sql.PreparedStatement
-import java.util.Date
+import java.time.{LocalDate, LocalDateTime, ZoneId}
+import java.util.{Date => JuDate}
 
 /**
  * Runtime binding -- work in progress
@@ -36,16 +37,44 @@ trait BindPsParam[A] {
   def bind(ps: PreparedStatement, index: Int, value: A): Unit
 }
 
-object BindPsParam {
+object BindPsParam extends Jsr310Support {
+
+  def zoneId: ZoneId = ZoneId.systemDefault()
+  val driverImplementsJdbc42: Boolean = false
 
   import reflect.runtime.{universe => u}
 
-  implicit val bindInt = new BindPsParam[Int] { def bind(ps: PreparedStatement, index: Int, value: Int): Unit = { ps.setInt(index, value)} }
-  implicit val bindLong = new BindPsParam[Long] { def bind(ps: PreparedStatement, index: Int, value: Long): Unit = { ps.setLong(index, value)} }
-  implicit val bindFloat = new BindPsParam[Float] { def bind(ps: PreparedStatement, index: Int, value: Float): Unit = { ps.setFloat(index, value)} }
-  implicit val bindDouble = new BindPsParam[Double] { def bind(ps: PreparedStatement, index: Int, value: Double): Unit = { ps.setDouble(index, value)} }
-  implicit val bindString = new BindPsParam[String] { def bind(ps: PreparedStatement, index: Int, value: String): Unit = { ps.setString(index, value)} }
-  implicit val bindDate = new BindPsParam[Date] { def bind(ps: PreparedStatement, index: Int, value: Date): Unit = { ps.setDate(index, new java.sql.Date(value.getTime))} }
+  implicit val bindInt = new BindPsParam[Int] {
+    def bind(ps: PreparedStatement, index: Int, value: Int): Unit = { ps.setInt(index, value)}
+  }
+
+  implicit val bindLong = new BindPsParam[Long] {
+    def bind(ps: PreparedStatement, index: Int, value: Long): Unit = { ps.setLong(index, value)}
+  }
+
+  implicit val bindFloat = new BindPsParam[Float] {
+    def bind(ps: PreparedStatement, index: Int, value: Float): Unit = { ps.setFloat(index, value)}
+  }
+
+  implicit val bindDouble = new BindPsParam[Double] {
+    def bind(ps: PreparedStatement, index: Int, value: Double): Unit = { ps.setDouble(index, value)}
+  }
+
+  implicit val bindString = new BindPsParam[String] {
+    def bind(ps: PreparedStatement, index: Int, value: String): Unit = { ps.setString(index, value)}
+  }
+
+  implicit val bindJuDate = new BindPsParam[JuDate] {
+    def bind(ps: PreparedStatement, index: Int, value: JuDate): Unit = { ps.setDate(index, new java.sql.Date(value.getTime))}
+  }
+
+  implicit val bindLocalDate = new BindPsParam[LocalDate] {
+    def bind(ps: PreparedStatement, index: Int, value: LocalDate): Unit = { setLocalDate(ps, index, value) }
+  }
+
+  implicit val bindLocalDateTime = new BindPsParam[LocalDateTime] {
+    def bind(ps: PreparedStatement, index: Int, value: LocalDateTime): Unit = { setLocalDateTime(ps, index, value) }
+  }
 
   def mkBindOpt[A : BindPsParam : u.TypeTag] = new BindPsParam[Option[A]] {
     def bind(ps: PreparedStatement, index: Int, value: Option[A]): Unit = {
@@ -61,5 +90,7 @@ object BindPsParam {
   implicit val bindFloatOpt = mkBindOpt[Float]
   implicit val bindDoubleOpt = mkBindOpt[Double]
   implicit val bindStringOpt = mkBindOpt[String]
-  implicit val bindDateOpt = mkBindOpt[Date]
+  implicit val bindJuDateOpt = mkBindOpt[JuDate]
+  implicit val bindLocalDateOpt = mkBindOpt[LocalDate]
+  implicit val bindLocalDateTimeOpt = mkBindOpt[LocalDateTime]
 }

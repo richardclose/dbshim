@@ -1,6 +1,7 @@
 package org.phasanix.dbshim
 
 import java.sql.ResultSet
+import java.time.{LocalDate, LocalDateTime, ZoneId}
 
 /**
   * Typeclass for reading values from a ResultSet.
@@ -9,8 +10,11 @@ trait ReadRs[A] {
   def read(rs: ResultSet, index: Int): A
 }
 
-object ReadRs {
-  
+object ReadRs extends Jsr310Support {
+
+  def zoneId: ZoneId = ZoneId.systemDefault()
+  val driverImplementsJdbc42: Boolean = false
+
   implicit object readInt extends ReadRs[Int] {
     def read(rs: ResultSet, index: Int): Int = rs.getInt(index)
   }
@@ -37,6 +41,14 @@ object ReadRs {
 
   implicit object readBoolean extends ReadRs[Boolean] {
     def read(rs: ResultSet, index: Int): Boolean = rs.getBoolean(index)
+  }
+
+  implicit object readLocalDate extends ReadRs[LocalDate] {
+    def read(rs: ResultSet, index: Int): LocalDate = getLocalDate(rs, index)
+  }
+
+  implicit object readLocalDateTime extends ReadRs[LocalDateTime] {
+    def read(rs: ResultSet, index: Int): LocalDateTime = getLocalDateTime(rs, index)
   }
 
 }
