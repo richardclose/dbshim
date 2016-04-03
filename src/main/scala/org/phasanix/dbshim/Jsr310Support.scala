@@ -1,8 +1,7 @@
 package org.phasanix.dbshim
 
-import java.sql.{PreparedStatement, ResultSet}
+import java.sql.{PreparedStatement, ResultSet, Timestamp, Date => SqlDate}
 import java.time._
-import java.sql.{Date => SqlDate}
 
 /**
   * Helper methods to support Java 8 date and time API for
@@ -34,16 +33,16 @@ trait Jsr310Support {
       null
     }
     if (d == null) {
-      val date = rs.getDate(columnIndex)
-      d = ZonedDateTime.ofInstant(Instant.ofEpochMilli(date.getTime), zoneId).toLocalDateTime
+      val ts = rs.getTimestamp(columnIndex)
+      d = ZonedDateTime.ofInstant(Instant.ofEpochMilli(ts.getTime), zoneId).toLocalDateTime
     }
     d
   }
 
   def setLocalDateTime(ps: PreparedStatement, parameterIndex: Int, value: LocalDateTime): Unit = {
     val instant = ZonedDateTime.of(value, zoneId).toInstant
-    val date = new SqlDate(instant.toEpochMilli)
-    ps.setDate(parameterIndex, date)
+    val ts = new Timestamp(instant.toEpochMilli)
+    ps.setTimestamp(parameterIndex, ts)
   }
 
   def setLocalDate(ps: PreparedStatement, parameterIndex: Int, value: LocalDate): Unit = {

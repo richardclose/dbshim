@@ -9,10 +9,15 @@ class PreparedStatementBinder(ps: PreparedStatement) {
 
   private var currentIndex: Int = 1
 
-  /** Bind the given value to the next parameter of the prepared statement */
+  /** Set the given value to the next parameter of the prepared statement */
   def set[A: BindPsParam](value: A): PreparedStatementBinder = {
     implicitly[BindPsParam[A]].bind(ps, currentIndex, value)
     currentIndex += 1
+    this
+  }
+
+  def bind[A](binder: JdbcBinder[A], value: A): PreparedStatementBinder = {
+    binder.bindPreparedStatement(ps, value)
     this
   }
 
