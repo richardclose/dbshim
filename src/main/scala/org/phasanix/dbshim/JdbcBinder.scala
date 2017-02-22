@@ -138,6 +138,12 @@ abstract class JdbcBinder[A] (val arity: Int, val fieldNames: Seq[String]) exten
     ret
   }
 
+  /**
+    * Fieldnames mapped from camel case to snake case, for use
+    * as list of column names of underlying table.
+    */
+  val columnNames: Seq[String] = fieldNames.map(Db.cameToSnake)
+
   // Used in generated code for reading nullable columns
   protected def _opt[T](rs: ResultSet, x: T): Option[T] = if (rs.wasNull()) None else Some(x)
 
@@ -155,7 +161,6 @@ abstract class JdbcBinder[A] (val arity: Int, val fieldNames: Seq[String]) exten
       }
     }
   }
-
 
 }
 

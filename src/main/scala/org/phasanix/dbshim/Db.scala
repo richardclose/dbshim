@@ -244,4 +244,17 @@ object Db {
       case _ => T.JAVA_OBJECT
     }
   }
+
+  /**
+    * Convert camelCase name to snake_case name
+    * @param name camelCase name
+    * @return
+    */
+  def cameToSnake(name: String): String = {
+    val accumulated = name.foldLeft((name.head, "")) {(acc, ch) =>
+      if (acc._1.isLower && ch.isUpper) (ch, acc._2 + '_' +  ch.toLower)
+      else (ch, acc._2 + ch.toLower)
+    }
+    accumulated._2
+  }
 }
