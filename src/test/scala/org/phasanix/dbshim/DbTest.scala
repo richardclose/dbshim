@@ -30,9 +30,9 @@ import java.sql.ResultSet
 import java.util.{Date => JuDate}
 import java.time.LocalDate
 
-import org.scalatest.{ShouldMatchers, FunSuite}
+import org.scalatest.{FunSuite, Matchers}
 
-class DbTest extends FunSuite with ShouldMatchers {
+class DbTest extends FunSuite with Matchers {
 
   def values(rs: ResultSet): Seq[AnyRef] = {
     (1 to rs.getMetaData.getColumnCount).map(rs.getObject)

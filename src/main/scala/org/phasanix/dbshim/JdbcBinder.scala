@@ -203,7 +203,7 @@ object JdbcBinder {
         case x if x =:= typeOf[Float] => q"rs.getFloat($indexExpr)"
         case x if x =:= typeOf[Double] => q"rs.getDouble($indexExpr)"
         case x if x =:= typeOf[String] => q"rs.getString($indexExpr)"
-        case x if x =:= typeOf[JUDate] => q"rs.getDate($indexExpr)"
+        case x if x =:= typeOf[JUDate] => q"new java.util.Date(rs.getTimestamp($indexExpr).getTime)"
         case x if x =:= typeOf[LocalDate] => q"getLocalDate(rs, $indexExpr)"
         case x if x =:= typeOf[LocalDateTime] => q"getLocalDateTime(rs, $indexExpr)"
         case x if x =:= typeOf[Boolean] => q"rs.getBoolean($indexExpr)"
@@ -234,7 +234,7 @@ object JdbcBinder {
         case x if x =:= typeOf[Float] => q"ps.setFloat($indexExpr, $propExpr)"
         case x if x =:= typeOf[Double] => q"ps.setDouble($indexExpr, $propExpr)"
         case x if x =:= typeOf[String] => q"ps.setString($indexExpr, $propExpr)"
-        case x if x =:= typeOf[JUDate] => q"ps.setDate($indexExpr, new java.sql.Date($propExpr.getTime()))"
+        case x if x =:= typeOf[JUDate] => q"ps.setTimestamp($indexExpr, new java.sql.Timestamp($propExpr.getTime()))"
         case x if x =:= typeOf[LocalDate] => q"setLocalDate(ps, $indexExpr, $propExpr)"
         case x if x =:= typeOf[LocalDateTime] => q"setLocalDateTime(ps, $indexExpr, $propExpr)"
         case x if x =:= typeOf[Boolean] => q"ps.setBoolean($indexExpr, $propExpr)"
@@ -368,6 +368,7 @@ object JdbcBinder {
 
   /**
     * Create a binder for a function returning the required type.
+    * XXX: Fails with Scala 2.12 -- investigating.
     * Call like this:
     * <code>
     *   val binder: JdbcBinder[MyType] = JdbcBinder.func[MyType].create(myFunction _)
@@ -411,19 +412,21 @@ object JdbcBinder {
     q"""
      new org.phasanix.dbshim.JdbcBinder[$tRet]($arity, $fieldNames) {
        def fromResultSetMapped(rs: java.sql.ResultSet, offsets: IndexedSeq[Int]): $tRet = {
-         $fn(..$argExprs)
+         $fn.apply(..$argExprs)
        }
 
        def fromResultSet(rs: java.sql.ResultSet): $tRet = {
-         $fn(..$argExprsDirect)
+         $fn.apply(..$argExprsDirect)
        }
 
        def bindPreparedStatement(ps: java.sql.PreparedStatement, value: $tRet, offsets: IndexedSeq[Int]): Unit = ???
 
        def bindPreparedStatement(ps: java.sql.PreparedStatement, value: $tRet): Unit = ???
-
      }
      """
   }
+}
+
+abstract class FunctionBinder[A, F](arity: Int, fieldNames: Seq[String], val boundFn: F) extends JdbcBinder[A](arity, fieldNames) {
 
 }
