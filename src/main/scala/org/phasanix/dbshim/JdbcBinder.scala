@@ -367,20 +367,21 @@ object JdbcBinder {
   }
 
   /**
-    * Create a binder for a function returning the required type.
-    * XXX: Fails with Scala 2.12 -- investigating.
+    * Generate a function which create the required type from a ResultSet
     * Call like this:
     * <code>
-    *   val binder: JdbcBinder[MyType] = JdbcBinder.func[MyType].create(myFunction _)
+    *   val binder: JdbcBinder[MyType] = JdbcBinder.func[MyType].bind(myFunction _)
     * </code>
     *
     * @tparam A type created by bound function
     */
-  def func[A] = new FnBind[A]()
+  def func[A]: FnBind[A] = new FnBind[A]
 
-  class FnBind[A]() {
-    def create[F](fn: F): JdbcBinder[A] = macro createFn_impl[F, A]
+  class FnBind[A] {
+    def bind[F](fn: F): ResultSet => A = macro createFn_impl[F, A]
   }
+
+  // macro createFn_impl[F, A]
 
   def createFn_impl[F: c.WeakTypeTag, A: c.WeakTypeTag](c: blackbox.Context)(fn: c.Expr[F]) = {
     import c.universe._
@@ -389,7 +390,7 @@ object JdbcBinder {
     val tRet = weakTypeOf[A]
     val helper = new Helper[c.type](c)
 
-    c.info(NoPosition, s"generating binder for function: $tFn", force = true)
+    c.info(NoPosition, s"generating call site for function: $tFn", force = true)
 
     // get apply() method and type parameters, and check that the function
     // conforms.
@@ -406,25 +407,16 @@ object JdbcBinder {
       c.abort(NoPosition, s"$tFn doesn't return the requested type $tRet")
 
     val fieldNames = List.tabulate(arity) { i => s"_$i" }
-    val argExprs = helper.mkArgExprs(argTypes, { i: Int => q"offsets($i)" })
     val argExprsDirect = helper.mkArgExprs(argTypes, { i: Int => Literal(Constant(i+1)) } )
 
     q"""
-     new org.phasanix.dbshim.JdbcBinder[$tRet]($arity, $fieldNames) {
-       def fromResultSetMapped(rs: java.sql.ResultSet, offsets: IndexedSeq[Int]): $tRet = {
-         $fn.apply(..$argExprs)
-       }
-
-       def fromResultSet(rs: java.sql.ResultSet): $tRet = {
-         $fn.apply(..$argExprsDirect)
-       }
-
-       def bindPreparedStatement(ps: java.sql.PreparedStatement, value: $tRet, offsets: IndexedSeq[Int]): Unit = ???
-
-       def bindPreparedStatement(ps: java.sql.PreparedStatement, value: $tRet): Unit = ???
-     }
-     """
+    (rs: java.sql.ResultSet) => {
+        $fn.apply(..$argExprsDirect)
+    }"""
   }
+
+  def mkFunc[F, A](fn: F): ResultSet => A = ???
+
 }
 
 abstract class FunctionBinder[A, F](arity: Int, fieldNames: Seq[String], val boundFn: F) extends JdbcBinder[A](arity, fieldNames) {

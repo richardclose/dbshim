@@ -16,8 +16,8 @@ It uses macros to generate the necessary calls to `ResultSet.getXxx` and
 yet. Nullable columns are represented as `Option`s.
 
 Instances of `JdbcBinder` are created for tuples and case classes by `JdbcBinder.create[A]`.
-Create a `JdbcBinder` for a factory method like this:
-`val binder: JdbcBinder[MyType] = JdbcBinder.func[MyType].create(makeMyType _)
+Create a function (`ResultSet => MyType`) for a factory method like this:
+`val fn: ResultSet => MyType = JdbcBinder.func[MyType].create(makeMyType _)
 `. It is necessary to convert the method to a function, as shown, so that the macro
 has a type to work with.
 
@@ -71,10 +71,10 @@ def createBike(make: String, weight: Double, groupset: Option[String])(implicit 
 def loadAsFixies(implicit conn: Connection): Seq[Bicycle] = {
   val stmt = conn.prepareStatement("select id, weight from BICYCLE")
   val rs = stmt.executeQuery()
-  val binder = JdbcBinder.function[Bicycle].create(Bicycle.fixie _)
+  val fn: ResultSet => Bicycle = JdbcBinder.func[Bicycle].bind(Bicycle.fixie _)
   val arr = collection.mutable.ArrayBuffer.empty[Bicycle]
   while (rs.hasNext()) {
-    arr.append(binder.fromResultSet(rs))
+    arr.append(fn(rs))
   }
   stmt.close()
   arr.toSeq

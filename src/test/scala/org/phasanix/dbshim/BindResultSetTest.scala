@@ -73,18 +73,14 @@ class BindResultSetTest extends FunSuite with Matchers {
    }
   }
 
-  /* XXX: Not working with Scala 2.12
-  test("binder for factory function should work") {
-
-    def factoryFn(id: Int, name: String): BindResultSetTest.TestA = {
-      BindResultSetTest.TestA(id, name, "red", None)
-    }
+  test(s"binder for factory function should work (Scala version=${util.Properties.versionString})") {
 
     DbFixture.withConnection { implicit  c =>
 
-      val binder: JdbcBinder[BindResultSetTest.TestA] = JdbcBinder.func[BindResultSetTest.TestA].create(factoryFn _)
+      val fn =JdbcBinder.func[BindResultSetTest.TestA].bind(BindResultSetTest.factoryFn _)
+
       val xs = Db.autocloseQuery("select id, name from TEST.A")
-        .map(binder.fromResultSet)
+        .map(fn)
         .toIndexedSeq
 
       xs.length shouldBe 4
@@ -92,7 +88,6 @@ class BindResultSetTest extends FunSuite with Matchers {
       xs(3).colour shouldBe "red"
     }
   }
-    */
 
   test("date conversions should work") {
     val binder: JdbcBinder[BindResultSetTest.TestB] = implicitly[JdbcBinder[BindResultSetTest.TestB]]
@@ -132,5 +127,10 @@ class BindResultSetTest extends FunSuite with Matchers {
 object BindResultSetTest {
   case class TestA(id: Int, name: String, colour: String, weight: Option[Double])
   case class TestB(id: Long, name: String, when: java.util.Date, theDate: java.time.LocalDate)
+
+  def factoryFn(id: Int, name: String): BindResultSetTest.TestA = {
+    BindResultSetTest.TestA(id, name, "red", None)
+  }
+
 }
 
