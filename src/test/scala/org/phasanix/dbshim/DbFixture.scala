@@ -65,7 +65,10 @@ object DbFixture {
         |, weight double null
         |);
         |
-        |insert into A values (1,'apple','red',2.0),(2,'banana','yellow',null),(3,'cherry','red',1.5),(4,'damson','purple',null);
+        |insert into A values (1,'apple','red',2.0)
+        |, (2,'banana','yellow',null)
+        |, (3,'cherry','red',1.5)
+        |, (4,'damson','purple',null);
         |
         |create table B (
         |  id bigint primary key
@@ -79,6 +82,11 @@ object DbFixture {
         |, (2, 'fred',   '2016-01-02', '2014-03-11')
         |, (3, 'george', '2016-01-03', '2014-04-15');
         |
+        |create table C (
+        |  id bigint primary key
+        |, data blob not null
+        |, name varchar(20) not null
+        |);
       """.stripMargin
 
     val is = new ByteArrayInputStream(sql.getBytes)

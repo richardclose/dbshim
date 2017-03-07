@@ -26,10 +26,10 @@ SOFTWARE.
 
 package org.phasanix.dbshim
 
-import java.sql.{PreparedStatement, ResultSet}
+import java.io.InputStream
+import java.sql.{PreparedStatement, ResultSet, SQLException, Date => SqlDate}
 import java.time._
 import java.util.{Date => JUDate}
-import java.sql.{Date => SqlDate}
 
 /**
  * Interface for creating instances from jdbc resultsets, and binding instances to prepared statements.
@@ -144,9 +144,6 @@ abstract class JdbcBinder[A] (val arity: Int, val fieldNames: Seq[String]) exten
     */
   val columnNames: Seq[String] = fieldNames.map(Db.cameToSnake)
 
-  // Used in generated code for reading nullable columns
-  protected def _opt[T](rs: ResultSet, x: T): Option[T] = if (rs.wasNull()) None else Some(x)
-
   // given a list of indices to skip, create a skip list
   private def remapFromSkipList(toSkip: Int*): IndexedSeq[Int] = {
     var pos = 1
@@ -170,6 +167,59 @@ object JdbcBinder {
   import language.experimental.macros
 
   /**
+    * Used in generated code to wrap read of a nullable column
+    */
+  def opt[T](rs: ResultSet, x: T): Option[T] = if (rs.wasNull()) None else Some(x)
+
+  /**
+    * Wrap input stream from ResultSet.getBinaryStream, but defer read
+    * until after object creation but before the cursor moves on.
+    * (Could possibly read stream immediately and save to a temporary file
+    * for use indefinitely later).
+    */
+  def wrapInputStream(rs: ResultSet, columnIndex: Int): InputStream = {
+
+    new InputStream {
+      private var _is: Option[InputStream] = None
+      private val row = {
+        try {
+          rs.getRow
+        } catch {
+          case ex: SQLException =>
+            -1
+        }
+      }
+
+      def stream: InputStream = {
+        if (_is.isEmpty) {
+          if (row != -1 && row != rs.getRow)
+            throw new Exception(s"Attempt to call ResultSet.getBinaryStream($columnIndex) after ResultSet.next()")
+          _is = Some(rs.getBinaryStream(columnIndex))
+        }
+        _is.get
+      }
+
+      def read(): Int = stream.read()
+
+      override def read(bytes: Array[Byte]): Int = {
+        val bytesRead = stream.read(bytes)
+        if (bytesRead == -1)
+          _is.foreach(_.close())
+        bytesRead
+      }
+
+      override def read(bytes: Array[Byte], pos: Int, length: Int): Int = {
+        val bytesRead = stream.read(bytes, pos, length)
+        if (bytesRead == -1)
+          _is.foreach(_.close())
+        bytesRead
+      }
+
+      override def close(): Unit = _is.foreach(_.close())
+    }
+  }
+
+  /**
    * Utility methods.
    * Need to handle path-dependent types better to reduce
    * duplication.
@@ -181,16 +231,17 @@ object JdbcBinder {
 
     def sqlTypeOf(t: Type): Int = {
       t match {
-        case x if x =:= typeOf[Int] => T.INTEGER
-        case x if x =:= typeOf[Long] => T.BIGINT
-        case x if x =:= typeOf[Float] => T.FLOAT
-        case x if x =:= typeOf[Double] => T.DOUBLE
-        case x if x =:= typeOf[SqlDate] => T.DATE
-        case x if x =:= typeOf[LocalDate] => T.DATE
-        case x if x =:= typeOf[JUDate] => T.TIMESTAMP
+        case x if x =:= typeOf[Int]           => T.INTEGER
+        case x if x =:= typeOf[Long]          => T.BIGINT
+        case x if x =:= typeOf[Float]         => T.FLOAT
+        case x if x =:= typeOf[Double]        => T.DOUBLE
+        case x if x =:= typeOf[SqlDate]       => T.DATE
+        case x if x =:= typeOf[JUDate]        => T.TIMESTAMP
+        case x if x =:= typeOf[LocalDate]     => T.DATE
         case x if x =:= typeOf[LocalDateTime] => T.TIMESTAMP
-        case x if x =:= typeOf[String] => T.VARCHAR
-        case x if x =:= typeOf[Boolean] => T.BOOLEAN
+        case x if x =:= typeOf[String]        => T.VARCHAR
+        case x if x =:= typeOf[Boolean]       => T.BOOLEAN
+        case x if x =:= typeOf[InputStream]   => T.LONGVARBINARY
 
         case _ => T.JAVA_OBJECT
       }
@@ -199,16 +250,18 @@ object JdbcBinder {
     def readRsExpr(t: Type, indexExpr: c.Tree): c.Tree = {
       // c.info(NoPosition, s"readRsExpr($t)", force = true)
       t match {
-        case x if x =:= typeOf[Int] => q"rs.getInt($indexExpr)"
-        case x if x =:= typeOf[Float] => q"rs.getFloat($indexExpr)"
-        case x if x =:= typeOf[Double] => q"rs.getDouble($indexExpr)"
-        case x if x =:= typeOf[String] => q"rs.getString($indexExpr)"
-        case x if x =:= typeOf[JUDate] => q"new java.util.Date(rs.getTimestamp($indexExpr).getTime)"
-        case x if x =:= typeOf[LocalDate] => q"getLocalDate(rs, $indexExpr)"
+        case x if x =:= typeOf[Int]           => q"rs.getInt($indexExpr)"
+        case x if x =:= typeOf[Long]          => q"rs.getLong($indexExpr)"
+        case x if x =:= typeOf[Float]         => q"rs.getFloat($indexExpr)"
+        case x if x =:= typeOf[Double]        => q"rs.getDouble($indexExpr)"
+        case x if x =:= typeOf[JUDate]        => q"new java.util.Date(rs.getTimestamp($indexExpr).getTime)"
+        case x if x =:= typeOf[LocalDate]     => q"getLocalDate(rs, $indexExpr)"
         case x if x =:= typeOf[LocalDateTime] => q"getLocalDateTime(rs, $indexExpr)"
-        case x if x =:= typeOf[Boolean] => q"rs.getBoolean($indexExpr)"
-        case x if x =:= typeOf[Long] => q"rs.getLong($indexExpr)"
-        case x if x =:= typeOf[Char] => q"rs.getString($indexExpr).headOption.getOrElse(' ')"
+        case x if x =:= typeOf[String]        => q"rs.getString($indexExpr)"
+        case x if x =:= typeOf[Boolean]       => q"rs.getBoolean($indexExpr)"
+        case x if x =:= typeOf[Char]          => q"rs.getString($indexExpr).headOption.getOrElse(' ')"
+        case x if x =:= typeOf[InputStream]   => q"org.phasanix.dbshim.JdbcBinder.wrapInputStream(rs,$indexExpr)"
+
         case _ =>
           c.error(NoPosition, s"readRs: type not matched: $t")
           q"""Symbol("type not matched")""" // Trust that this will cause a compilation error
@@ -229,16 +282,18 @@ object JdbcBinder {
              }
            """
 
-        case x if x =:= typeOf[Int] => q"ps.setInt($indexExpr, $propExpr)"
-        case x if x =:= typeOf[Long] => q"ps.setLong($indexExpr, $propExpr)"
-        case x if x =:= typeOf[Float] => q"ps.setFloat($indexExpr, $propExpr)"
-        case x if x =:= typeOf[Double] => q"ps.setDouble($indexExpr, $propExpr)"
-        case x if x =:= typeOf[String] => q"ps.setString($indexExpr, $propExpr)"
-        case x if x =:= typeOf[JUDate] => q"ps.setTimestamp($indexExpr, new java.sql.Timestamp($propExpr.getTime()))"
-        case x if x =:= typeOf[LocalDate] => q"setLocalDate(ps, $indexExpr, $propExpr)"
+        case x if x =:= typeOf[Int]           => q"ps.setInt($indexExpr, $propExpr)"
+        case x if x =:= typeOf[Long]          => q"ps.setLong($indexExpr, $propExpr)"
+        case x if x =:= typeOf[Float]         => q"ps.setFloat($indexExpr, $propExpr)"
+        case x if x =:= typeOf[Double]        => q"ps.setDouble($indexExpr, $propExpr)"
+        case x if x =:= typeOf[JUDate]        => q"ps.setTimestamp($indexExpr, new java.sql.Timestamp($propExpr.getTime()))"
+        case x if x =:= typeOf[LocalDate]     => q"setLocalDate(ps, $indexExpr, $propExpr)"
         case x if x =:= typeOf[LocalDateTime] => q"setLocalDateTime(ps, $indexExpr, $propExpr)"
-        case x if x =:= typeOf[Boolean] => q"ps.setBoolean($indexExpr, $propExpr)"
-        case x if x =:= typeOf[Char] => q"ps.setString($indexExpr, java.lang.String.valueOf($propExpr))"
+        case x if x =:= typeOf[String]        => q"ps.setString($indexExpr, $propExpr)"
+        case x if x =:= typeOf[Boolean]       => q"ps.setBoolean($indexExpr, $propExpr)"
+        case x if x =:= typeOf[Char]          => q"ps.setString($indexExpr, java.lang.String.valueOf($propExpr))"
+        case x if x =:= typeOf[InputStream]   => q"ps.setBinaryStream($indexExpr, $propExpr)"
+
         case _ =>
           c.error(NoPosition, s"bindPs: type not matched: $t")
           q"42"
@@ -256,12 +311,13 @@ object JdbcBinder {
       for ((arg, i) <- argTypes.zipWithIndex) yield {
         val indexExpr = mkIndexExpr(i)
 
+        // If Option target, read inner type and wrap in null check.
         if (arg <:< typeOf[Option[_]]) {
           val typeArg = (arg match {
             case TypeRef(_, _, args) => args
           }).head
           val expr = readRsExpr(typeArg, indexExpr)
-          q"this._opt(rs, $expr)"
+          q"org.phasanix.dbshim.JdbcBinder.opt(rs, $expr)"
         } else {
           readRsExpr(arg, indexExpr)
         }
@@ -370,13 +426,17 @@ object JdbcBinder {
     * Generate a function which create the required type from a ResultSet
     * Call like this:
     * <code>
-    *   val binder: JdbcBinder[MyType] = JdbcBinder.func[MyType].bind(myFunction _)
+    *   val binder: ResultSet => MyType = JdbcBinder.func[MyType].bind(myFunction _)
     * </code>
     *
     * @tparam A type created by bound function
     */
   def func[A]: FnBind[A] = new FnBind[A]
 
+  /**
+    * Intermediate class, sole purpose is to let us specify type A but infer
+    * the type of F.
+    */
   class FnBind[A] {
     def bind[F](fn: F): ResultSet => A = macro createFn_impl[F, A]
   }
@@ -414,11 +474,5 @@ object JdbcBinder {
         $fn.apply(..$argExprsDirect)
     }"""
   }
-
-  def mkFunc[F, A](fn: F): ResultSet => A = ???
-
-}
-
-abstract class FunctionBinder[A, F](arity: Int, fieldNames: Seq[String], val boundFn: F) extends JdbcBinder[A](arity, fieldNames) {
 
 }

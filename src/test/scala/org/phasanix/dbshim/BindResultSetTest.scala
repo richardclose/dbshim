@@ -27,6 +27,7 @@ SOFTWARE.
 
 package org.phasanix.dbshim
 
+import java.io.ByteArrayInputStream
 import java.time.LocalDate
 import java.util.Date
 
@@ -122,6 +123,36 @@ class BindResultSetTest extends FunSuite with Matchers {
 
     before.when.getTime shouldBe after.when.getTime
   }
+
+  test("binary stream insertion should work") {
+
+    val bytes = Array.ofDim[Byte](2048)
+    util.Random.nextBytes(bytes)
+    val binder = JdbcBinder.create[(Long, java.io.InputStream, String)]
+    val placeholders = Array.fill(binder.arity)("?")
+    val key = 42L
+
+    val toBytes = DbFixture.withConnection { implicit c =>
+
+      val bais = new ByteArrayInputStream(bytes)
+
+      Db.prepare(s"insert into TEST.C values(${placeholders.mkString(",")})")
+        .bind(binder, (key, bais, "george"))
+        .update()
+
+      Db.withResultSet(s"select * from TEST.C where id=$key") { rs =>
+        rs.next()
+        val (id, stream, _) = binder.fromResultSet(rs)
+        val ret = Array.ofDim[Byte](bytes.length)
+        stream.read(ret)
+        stream.close()
+        ret
+      }
+    }
+
+    bytes.corresponds(toBytes)(_ == _) shouldBe true
+  }
+
 }
 
 object BindResultSetTest {

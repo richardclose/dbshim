@@ -240,6 +240,7 @@ object Db {
       case x if x =:= typeOf[java.util.Date] => T.TIMESTAMP
       case x if x =:= typeOf[String] => T.VARCHAR
       case x if x =:= typeOf[Boolean] => T.BOOLEAN
+      case x if x =:= typeOf[java.io.InputStream] => T.LONGVARBINARY
 
       case _ => T.JAVA_OBJECT
     }
