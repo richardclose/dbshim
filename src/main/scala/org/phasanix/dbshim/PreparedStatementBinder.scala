@@ -16,8 +16,11 @@ class PreparedStatementBinder(ps: PreparedStatement) {
     this
   }
 
-  def bind[A](binder: JdbcBinder[A], value: A): PreparedStatementBinder = {
-    binder.bindPreparedStatement(ps, value)
+  def bind[A](binder: JdbcBinder[A], value: A, skipList: Int*): PreparedStatementBinder = {
+    if (skipList.isEmpty)
+      binder.bindPreparedStatement(ps, value)
+    else
+      binder.bindPreparedStatementPartial(ps, value, skipList: _*)
     this
   }
 
@@ -26,5 +29,16 @@ class PreparedStatementBinder(ps: PreparedStatement) {
 
   /** execute the wrapped PreparedStatement as an update */
   def update(): Int = ps.executeUpdate()
+
+  /**
+    * execute the wrapped PreparedStatement as on insert.
+    *
+    * If successful and auto-increment key of type A generated,
+    * return Some(key value)
+    */
+  def insert[A: ReadRs](): Option[A] = {
+    val count = ps.executeUpdate()
+    Db.resultSetScalar[A](ps.getGeneratedKeys)
+  }
 
 }

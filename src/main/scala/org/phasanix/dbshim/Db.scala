@@ -219,6 +219,13 @@ object Db {
   }
 
   /**
+    * Create PreparedStatement for given sql, wrapped in PreparedStatementBinder
+    */
+  def prepareInsert(sql: String)(implicit conn: Connection): PreparedStatementBinder = {
+    new PreparedStatementBinder(conn.prepareStatement(sql, java.sql.Statement.RETURN_GENERATED_KEYS))
+  }
+
+  /**
     * Wrap given PreparedStatement in PreparedStatementBinder
     */
   def bindPs(ps: PreparedStatement): PreparedStatementBinder = {
