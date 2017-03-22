@@ -188,8 +188,6 @@ object JdbcBinder {
     */
   def wrapInputStream(binder: JdbcBinder[_], rs: ResultSet, columnIndex: Int): InputStream = {
 
-    println(s"==== wrapInputStream. col=${rs.getMetaData.getColumnName(columnIndex)}")
-
     // The stream length could be obtained from a query, but not from
     // here. Start by reading into an in-memory stream, then overflow to
     // a temporary file when the threshold is exceeded.
