@@ -26,7 +26,8 @@ SOFTWARE.
 
 package org.phasanix.dbshim
 
-import java.io.InputStream
+import java.io._
+import java.nio.file.{Files, Paths}
 import java.sql.{PreparedStatement, ResultSet, SQLException, Date => SqlDate}
 import java.time._
 import java.util.{Date => JUDate}
@@ -48,6 +49,7 @@ import java.util.{Date => JUDate}
 abstract class JdbcBinder[A] (val arity: Int, val fieldNames: Seq[String]) extends Jsr310Support with Cloneable {
 
   protected var _zoneId: ZoneId = ZoneId.systemDefault()
+  protected var _tempFileThreshold: Long = 1024 * 1024 * 1
 
   /**
     * In future, this will be determined by somehow querying or testing the
@@ -144,6 +146,13 @@ abstract class JdbcBinder[A] (val arity: Int, val fieldNames: Seq[String]) exten
     */
   val columnNames: Seq[String] = fieldNames.map(Db.cameToSnake)
 
+  /**
+    * Set the value, for which InputStreams backed by BLOBs will
+    * be written to temporary files rather than in-memory streams.
+    * The default value is 1 MB.
+    */
+  var tempFileThreshold: Long = 1L * 1024 * 1024
+
   // given a list of indices to skip, create a skip list
   private def remapFromSkipList(toSkip: Int*): IndexedSeq[Int] = {
     var pos = 1
@@ -172,51 +181,63 @@ object JdbcBinder {
   def opt[T](rs: ResultSet, x: T): Option[T] = if (rs.wasNull()) None else Some(x)
 
   /**
-    * Wrap input stream from ResultSet.getBinaryStream, but defer read
-    * until after object creation but before the cursor moves on.
-    * (Could possibly read stream immediately and save to a temporary file
-    * for use indefinitely later).
+    * Eagerly read input stream into in-memory stream or temporary file,
+    * depending on file size. (Using the stream from ResultSet.getBinaryStream
+    * directly is too fragile, as the ResultSet must remain open when the
+    * stream is read).
     */
-  def wrapInputStream(rs: ResultSet, columnIndex: Int): InputStream = {
+  def wrapInputStream(binder: JdbcBinder[_], rs: ResultSet, columnIndex: Int): InputStream = {
 
-    new InputStream {
-      private var _is: Option[InputStream] = None
-      private val row = {
-        try {
-          rs.getRow
-        } catch {
-          case ex: SQLException =>
-            -1
+    println(s"==== wrapInputStream. col=${rs.getMetaData.getColumnName(columnIndex)}")
+
+    // The stream length could be obtained from a query, but not from
+    // here. Start by reading into an in-memory stream, then overflow to
+    // a temporary file when the threshold is exceeded.
+
+    val is = rs.getBinaryStream(columnIndex)
+    val baos = new ByteArrayOutputStream()
+    var os: OutputStream  = baos
+    val buf = Array.ofDim[Byte](1024)
+    var done = false
+    var tempFile: Option[File] = None
+    var totalBytesRead = 0L
+
+    while (!done) {
+      val bytesRead = is.read(buf)
+      if (bytesRead == -1) {
+        done = true
+      } else {
+        os.write(buf, 0, bytesRead)
+        totalBytesRead += bytesRead
+
+        if (tempFile.isEmpty && totalBytesRead > binder.tempFileThreshold) {
+          val f = Files.createTempFile("dbshim", "blob").toFile
+          tempFile = Some(f)
+          os = new FileOutputStream(f)
+          val arr = baos.toByteArray
+          os.write(arr)
+          baos.close()
         }
       }
-
-      def stream: InputStream = {
-        if (_is.isEmpty) {
-          if (row != -1 && row != rs.getRow)
-            throw new Exception(s"Attempt to call ResultSet.getBinaryStream($columnIndex) after ResultSet.next()")
-          _is = Some(rs.getBinaryStream(columnIndex))
-        }
-        _is.get
-      }
-
-      def read(): Int = stream.read()
-
-      override def read(bytes: Array[Byte]): Int = {
-        val bytesRead = stream.read(bytes)
-        if (bytesRead == -1)
-          _is.foreach(_.close())
-        bytesRead
-      }
-
-      override def read(bytes: Array[Byte], pos: Int, length: Int): Int = {
-        val bytesRead = stream.read(bytes, pos, length)
-        if (bytesRead == -1)
-          _is.foreach(_.close())
-        bytesRead
-      }
-
-      override def close(): Unit = _is.foreach(_.close())
     }
+
+    tempFile match {
+      case None =>
+        val arr = baos.toByteArray
+        val ret = new ByteArrayInputStream(arr)
+        baos.close()
+        ret
+
+      case Some(tf) =>
+        os.close()
+        new FileInputStream(tf) {
+          override def close(): Unit = {
+            super.close()
+            Files.deleteIfExists(tf.toPath)
+          }
+        }
+    }
+
   }
 
   /**
@@ -260,7 +281,7 @@ object JdbcBinder {
         case x if x =:= typeOf[String]        => q"rs.getString($indexExpr)"
         case x if x =:= typeOf[Boolean]       => q"rs.getBoolean($indexExpr)"
         case x if x =:= typeOf[Char]          => q"rs.getString($indexExpr).headOption.getOrElse(' ')"
-        case x if x =:= typeOf[InputStream]   => q"org.phasanix.dbshim.JdbcBinder.wrapInputStream(rs,$indexExpr)"
+        case x if x =:= typeOf[InputStream]   => q"org.phasanix.dbshim.JdbcBinder.wrapInputStream(this, rs,$indexExpr)"
 
         case _ =>
           c.error(NoPosition, s"readRs: type not matched: $t")
