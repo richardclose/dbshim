@@ -31,6 +31,7 @@ import java.io.ByteArrayInputStream
 import java.time.LocalDate
 import java.util.Date
 
+import org.phasanix.dbshim
 import org.scalatest.{FunSuite, Matchers}
 
 class BindResultSetTest extends FunSuite with Matchers {
@@ -153,11 +154,42 @@ class BindResultSetTest extends FunSuite with Matchers {
     bytes.corresponds(toBytes)(_ == _) shouldBe true
   }
 
+  test("read value class should work") {
+    val binder = JdbcBinder.create[BindResultSetTest.TestD]
+    val d = DbFixture.withConnection { implicit c =>
+      Db.withResultSetOpt(s"select id, hash from TEST.D where id=1") { rs =>
+        binder.fromResultSet(rs)
+      }
+    }
+
+    d.get.hash.value shouldEqual 1001L
+  }
+
+  test("write value class should work") {
+    val binder = JdbcBinder.create[BindResultSetTest.TestD]
+    val d = DbFixture.withConnection { implicit c =>
+      Db.prepare(s"insert into TEST.D(id, hash) values(?,?)")
+        .bind(binder, BindResultSetTest.TestD(10, new BindResultSetTest.Hash(3000L)))
+        .update()
+
+      Db.withResultSetOpt(s"select id, hash from TEST.D where id=10") { rs =>
+        binder.fromResultSet(rs)
+      }
+    }
+
+    d.get.hash.value shouldEqual 3000L
+  }
+
 }
 
 object BindResultSetTest {
   case class TestA(id: Int, name: String, colour: String, weight: Option[Double])
+
   case class TestB(id: Long, name: String, when: java.util.Date, theDate: java.time.LocalDate)
+
+  class Hash(val value: Long) extends AnyVal
+
+  case class TestD(id: Int, hash: Hash)
 
   def factoryFn(id: Int, name: String): BindResultSetTest.TestA = {
     BindResultSetTest.TestA(id, name, "red", None)

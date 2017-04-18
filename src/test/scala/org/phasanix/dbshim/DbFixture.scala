@@ -87,6 +87,15 @@ object DbFixture {
         |, data blob not null
         |, name varchar(20) not null
         |);
+        |
+        |create table D (
+        |  id int primary key
+        |, hash bigint not null
+        |);
+        |
+        |insert into D values
+        |  (1, 1001)
+        |, (2, 1002);
       """.stripMargin
 
     val is = new ByteArrayInputStream(sql.getBytes)

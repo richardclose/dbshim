@@ -266,6 +266,16 @@ object JdbcBinder {
       }
     }
 
+    private def extractValueClassArg(t: Type)  = {
+      val ts = t.typeSymbol
+      if (ts.isClass && ts.asClass.isDerivedValueClass) {
+        val arg = t.decls.find(_.isConstructor).get.asMethod.paramLists.head.head
+        Some(arg)
+      } else {
+        None
+      }
+    }
+
     def readRsExpr(t: Type, indexExpr: c.Tree): c.Tree = {
       // c.info(NoPosition, s"readRsExpr($t)", force = true)
       t match {
@@ -282,8 +292,16 @@ object JdbcBinder {
         case x if x =:= typeOf[InputStream]   => q"org.phasanix.dbshim.JdbcBinder.wrapInputStream(this, rs,$indexExpr)"
 
         case _ =>
-          c.error(NoPosition, s"readRs: type not matched: $t")
-          q"""Symbol("type not matched")""" // Trust that this will cause a compilation error
+          extractValueClassArg(t) match {
+            case Some(arg) =>
+              // Construct value class from primitive
+              val expr = readRsExpr(arg.typeSignature, indexExpr)
+              q"""new $t($expr)"""
+
+            case None =>
+              c.error(NoPosition, s"readRs: type not matched: $t")
+              q"""Symbol("type not matched")""" // Trust that this will cause a compilation error
+          }
       }
     }
 
@@ -313,9 +331,17 @@ object JdbcBinder {
         case x if x =:= typeOf[Char]          => q"ps.setString($indexExpr, java.lang.String.valueOf($propExpr))"
         case x if x =:= typeOf[InputStream]   => q"ps.setBinaryStream($indexExpr, $propExpr)"
 
+
         case _ =>
-          c.error(NoPosition, s"bindPs: type not matched: $t")
-          q"42"
+          extractValueClassArg(t) match {
+            case Some(arg) =>
+              // extract value member of value class
+              bindPsExpr(arg.typeSignature, q"$propExpr.${arg.name.toTermName}", indexExpr)
+
+            case None =>
+              c.error(NoPosition, s"bindPs: type not matched: $t")
+              q"42"
+          }
       }
 
       q"if ($indexExpr != 0) {$ex1}"
@@ -442,7 +468,7 @@ object JdbcBinder {
   }
 
   /**
-    * Generate a function which create the required type from a ResultSet
+    * Generate a function which creates the required type from a ResultSet
     * Call like this:
     * <code>
     *   val binder: ResultSet => MyType = JdbcBinder.func[MyType].bind(myFunction _)

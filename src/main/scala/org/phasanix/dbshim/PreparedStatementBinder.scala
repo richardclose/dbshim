@@ -16,11 +16,19 @@ class PreparedStatementBinder(ps: PreparedStatement) {
     this
   }
 
+  /** bind */
   def bind[A](binder: JdbcBinder[A], value: A, skipList: Int*): PreparedStatementBinder = {
     if (skipList.isEmpty)
       binder.bindPreparedStatement(ps, value)
     else
       binder.bindPreparedStatementPartial(ps, value, skipList: _*)
+    this
+  }
+
+  /** bind for update */
+  def bindForUpdate[A](binder: JdbcBinder[A], value: A, keyOffsets: Int*): PreparedStatementBinder = {
+    assert(keyOffsets.nonEmpty)
+    binder.bindPreparedStatementForUpdate(ps, value, keyOffsets: _*)
     this
   }
 
