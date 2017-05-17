@@ -144,7 +144,7 @@ abstract class JdbcBinder[A] (val arity: Int, val fieldNames: Seq[String]) exten
     * Fieldnames mapped from camel case to snake case, for use
     * as list of column names of underlying table.
     */
-  val columnNames: Seq[String] = fieldNames.map(Db.cameToSnake)
+  val columnNames: Seq[String] = fieldNames.map(Db.camelToSnake)
 
   /**
     * Set the value, for which InputStreams backed by BLOBs will

@@ -258,7 +258,7 @@ object Db {
     * @param name camelCase name
     * @return
     */
-  def cameToSnake(name: String): String = {
+  def camelToSnake(name: String): String = {
     val accumulated = name.foldLeft((name.head, "")) {(acc, ch) =>
       if (acc._1.isLower && ch.isUpper) (ch, acc._2 + '_' +  ch.toLower)
       else (ch, acc._2 + ch.toLower)
