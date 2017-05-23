@@ -5,7 +5,7 @@ import java.sql.{PreparedStatement, ResultSet}
 /**
   * Fluent API for binding params to a prepared statement
   */
-class PreparedStatementBinder(ps: PreparedStatement) {
+class PreparedStatementBinder(val ps: PreparedStatement) {
 
   private var currentIndex: Int = 1
 

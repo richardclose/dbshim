@@ -103,7 +103,7 @@ object Db {
     try {
       block(stmt.executeQuery())
     } finally {
-      stmt.close()
+      stmt.close() // Should close resultset too
     }
   }
 
