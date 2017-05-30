@@ -138,10 +138,28 @@ object Db {
     * @param block block to execute
     * @param conn database connection
     * @tparam A result type
-    * @return result
+    * @return result option
     */
   def withResultSetOpt[A](sql: String, args: Any*)(block: ResultSet => A)(implicit conn: Connection): Option[A] = {
     withResultSet(sql, args: _*) { rs =>
+      if (rs.next())
+        Some(block(rs))
+      else
+        None
+    }
+  }
+
+  /**
+    * Execute the given prepared statement as query, pass the resultset to the
+    * given block once for the first result, or None if empty
+    * @param ps prepared statement
+    * @param block block to execute
+    * @param conn database connection
+    * @tparam A result type
+    * @return result option
+    */
+  def withResultSetOpt[A](ps: PreparedStatement)(block: ResultSet => A)(implicit conn: Connection): Option[A] = {
+    withResultSet(ps) { rs =>
       if (rs.next())
         Some(block(rs))
       else
@@ -245,6 +263,8 @@ object Db {
       case x if x =:= typeOf[Float] => T.FLOAT
       case x if x =:= typeOf[Double] => T.DOUBLE
       case x if x =:= typeOf[java.util.Date] => T.TIMESTAMP
+      case x if x =:= typeOf[java.time.LocalDate] => T.DATE
+      case x if x =:= typeOf[java.time.LocalDateTime] => T.TIMESTAMP
       case x if x =:= typeOf[String] => T.VARCHAR
       case x if x =:= typeOf[Boolean] => T.BOOLEAN
       case x if x =:= typeOf[java.io.InputStream] => T.LONGVARBINARY
