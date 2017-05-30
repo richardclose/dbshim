@@ -52,3 +52,8 @@ trait Jsr310Support {
   }
 
 }
+
+object Jsr310SupportSystem extends Jsr310Support {
+  def zoneId: ZoneId = ZoneId.systemDefault()
+  val driverImplementsJdbc42: Boolean = false
+}
