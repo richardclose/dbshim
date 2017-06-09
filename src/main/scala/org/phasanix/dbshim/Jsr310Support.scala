@@ -14,14 +14,17 @@ trait Jsr310Support {
 
   // Get a DATE value as a java.time.LocalDate, called from generated code.
   def getLocalDate(rs: ResultSet, columnIndex: Int): LocalDate = {
-    var d: LocalDate = if (driverImplementsJdbc42) {
+
+    if (driverImplementsJdbc42) {
       rs.getObject(columnIndex, classOf[LocalDate])
     } else {
-      null
+      val d1 = rs.getDate(columnIndex)
+      if (d1 == null)
+        LocalDate.MIN // was null, will be ignored
+      else
+        d1.toLocalDate
     }
-    if (d == null)
-      d = rs.getDate(columnIndex).toLocalDate
-    d
+
   }
 
   //  Get a TIMESTAMP value, called from generated code. Makes the assumption
