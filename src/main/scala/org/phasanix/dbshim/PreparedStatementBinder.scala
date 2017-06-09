@@ -16,6 +16,17 @@ class PreparedStatementBinder(val ps: PreparedStatement) {
     this
   }
 
+  /** Set the given value to the next parameter for an Option
+    * (Can't use set[A] -- different kind) */
+  def setOpt[A: BindPsParam : scala.reflect.runtime.universe.TypeTag](maybeValue: Option[A]): PreparedStatementBinder = {
+    maybeValue match {
+      case Some(value) => implicitly[BindPsParam[A]].bind(ps, currentIndex, value)
+      case None => ps.setNull(currentIndex, Db.sqlTypeOf[A])
+    }
+    currentIndex += 1
+    this
+  }
+
   /** bind */
   def bind[A](binder: JdbcBinder[A], value: A, skipList: Int*): PreparedStatementBinder = {
     if (skipList.isEmpty)
@@ -37,6 +48,12 @@ class PreparedStatementBinder(val ps: PreparedStatement) {
 
   /** execute the wrapped PreparedStatement as an update */
   def update(): Int = ps.executeUpdate()
+
+  /** execute as query and return sequence of parsed objects */
+  def toSeq[A](func: ResultSet => A): Seq[A] = {
+    val rs = ps.executeQuery()
+    Db.resultSetVector(rs)(func)
+  }
 
   /**
     * execute the wrapped PreparedStatement as on insert.

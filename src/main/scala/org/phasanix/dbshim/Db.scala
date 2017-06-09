@@ -27,7 +27,6 @@ SOFTWARE.
 package org.phasanix.dbshim
 
 import java.sql.{PreparedStatement, Connection, ResultSet}
-import java.sql.{Date => SqlDate}
 
 import reflect.runtime.universe._
 
