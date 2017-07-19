@@ -139,6 +139,7 @@ object Db {
     * @tparam A result type
     * @return result option
     */
+  @deprecated("Use prepare/set/query/RichResultSet")
   def withResultSetOpt[A](sql: String, args: Any*)(block: ResultSet => A)(implicit conn: Connection): Option[A] = {
     withResultSet(sql, args: _*) { rs =>
       if (rs.next())
@@ -283,5 +284,11 @@ object Db {
       else (ch, acc._2 + ch.toLower)
     }
     accumulated._2
+  }
+
+  /** Convenience implicit for extending ResultSet */
+  implicit class RichResultSet(private val rs: ResultSet) extends AnyVal {
+    def parse[A](fn: ResultSet => A): Seq[A] = resultSetVector(rs)(fn)
+    def parseOpt[A](fn: ResultSet => A): Option[A] = resultSetOpt(rs)(fn)
   }
 }
