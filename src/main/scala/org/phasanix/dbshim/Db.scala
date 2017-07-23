@@ -117,6 +117,7 @@ object Db {
    * @tparam A result type
    * @return result
    */
+  @deprecated("Use prepare/set/query/RichResultSet or PreparedStatementBinder.parse")
   def withResultSet[A](sql: String, args: Any*)(block: ResultSet => A)(implicit conn: Connection): A = {
     val stmt = conn.prepareStatement(sql)
     args.zipWithIndex.foreach { case (arg, i) => stmt.setObject(i + 1, arg.asInstanceOf[AnyRef]) }
@@ -139,7 +140,7 @@ object Db {
     * @tparam A result type
     * @return result option
     */
-  @deprecated("Use prepare/set/query/RichResultSet")
+  @deprecated("Use prepare/set/query/RichResultSet or PreparedStatementBinder.parseOpt")
   def withResultSetOpt[A](sql: String, args: Any*)(block: ResultSet => A)(implicit conn: Connection): Option[A] = {
     withResultSet(sql, args: _*) { rs =>
       if (rs.next())

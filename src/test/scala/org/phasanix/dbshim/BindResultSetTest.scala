@@ -180,6 +180,26 @@ class BindResultSetTest extends FunSuite with Matchers {
     d.get.hash.value shouldEqual 3000L
   }
 
+
+  test("fluent API (parse/parseOpt) should work") {
+
+    import Db.RichResultSet
+
+    DbFixture.withConnection { implicit c =>
+      val a = Db.prepare("select * from TEST.A order by id")
+        .query()
+        .parse(rs => rs.getInt(1))
+
+      a.sum shouldEqual 10
+
+      val b = Db.prepare("select * from TEST.A where id=?")
+         .set(4)
+        .parseOpt(rs => rs.getString(2))
+
+      b.get shouldEqual "damson"
+    }
+  }
+
 }
 
 object BindResultSetTest {

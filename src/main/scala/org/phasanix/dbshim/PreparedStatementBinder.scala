@@ -66,4 +66,25 @@ class PreparedStatementBinder(val ps: PreparedStatement) {
     Db.resultSetScalar[A](ps.getGeneratedKeys)
   }
 
+  /**
+    * Execute the wrapped PreparedStatement as a query
+    * @param fn conversion from ResultSet to A
+    * @tparam A target type
+    * @return sequence of A
+    */
+  def parse[A](fn: ResultSet => A): Seq[A] = {
+    Db.resultSetVector(ps.executeQuery())(fn)
+  }
+
+  /**
+    * Execute the wrapped PreparedStatement as a query
+    * @param fn conversion from ResultSet to A
+    * @tparam A target type
+    * @return None if no rows selected, else Some(first row)
+    *         if one or more rows selected.
+    */
+  def parseOpt[A](fn: ResultSet => A): Option[A] = {
+    Db.resultSetOpt(ps.executeQuery())(fn)
+  }
+
 }
