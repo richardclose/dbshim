@@ -64,6 +64,10 @@ object BindPsParam extends Jsr310Support {
     def bind(ps: PreparedStatement, index: Int, value: String): Unit = { ps.setString(index, value)}
   }
 
+  implicit val bindChar = new BindPsParam[Char] {
+    def bind(ps: PreparedStatement, index: Int, value: Char): Unit = { ps.setString(index, value.toString) }
+  }
+
   implicit val bindJuDate = new BindPsParam[JuDate] {
     def bind(ps: PreparedStatement, index: Int, value: JuDate): Unit = { ps.setDate(index, new java.sql.Date(value.getTime))}
   }
@@ -90,6 +94,7 @@ object BindPsParam extends Jsr310Support {
   implicit val bindFloatOpt = mkBindOpt[Float]
   implicit val bindDoubleOpt = mkBindOpt[Double]
   implicit val bindStringOpt = mkBindOpt[String]
+  implicit val bindCharOpt = mkBindOpt[Char]
   implicit val bindJuDateOpt = mkBindOpt[JuDate]
   implicit val bindLocalDateOpt = mkBindOpt[LocalDate]
   implicit val bindLocalDateTimeOpt = mkBindOpt[LocalDateTime]
