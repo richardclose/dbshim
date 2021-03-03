@@ -227,7 +227,7 @@ object Db {
     } finally {
       rs.close()
     }
-    ret
+    ret.toSeq
   }
 
   /**

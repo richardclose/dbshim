@@ -26,13 +26,13 @@ SOFTWARE.
 
 package org.phasanix.dbshim
 
-import java.sql.ResultSet
+import java.sql.{Connection, ResultSet}
 import java.util.{Date => JuDate}
 import java.time.LocalDate
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
 
-import org.scalatest.{FunSuite, Matchers}
-
-class DbTest extends FunSuite with Matchers {
+class DbTest extends AnyFunSuite with Matchers {
 
   def values(rs: ResultSet): Seq[AnyRef] = {
     (1 to rs.getMetaData.getColumnCount).map(rs.getObject)
@@ -49,14 +49,14 @@ class DbTest extends FunSuite with Matchers {
   }
 
   test("autoclose iterator should close connection") {
-    implicit val conn = DbFixture.getConnection
+    implicit val conn: Connection = DbFixture.getConnection
     val it = Db.autocloseQuery("select * from TEST.A")
     val x = it.toSeq.last // read to end
     conn.isClosed shouldBe true
   }
 
   test("repeated calls to resultset iterator hasNext should be idempotent") {
-    implicit val conn = DbFixture.getConnection
+    implicit val conn: Connection = DbFixture.getConnection
     val it = Db.autocloseQuery("select  * from TEST.A")
 
     // The iterator implementation should be correct in the case of
@@ -69,7 +69,7 @@ class DbTest extends FunSuite with Matchers {
   }
 
   test("repeated calls to resultset iterator next should not break iteration") {
-    implicit val conn = DbFixture.getConnection
+    implicit val conn: Connection = DbFixture.getConnection
     val it = Db.autocloseQuery("select * from TEST.A")
 
     // Repeated calls to ResultSet.next() should not happen in real code

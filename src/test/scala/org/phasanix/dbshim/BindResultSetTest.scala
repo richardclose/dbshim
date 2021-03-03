@@ -27,30 +27,33 @@ SOFTWARE.
 
 package org.phasanix.dbshim
 
+import org.phasanix.dbshim.BindResultSetTest.factoryFn
+
 import java.io.ByteArrayInputStream
 import java.time.LocalDate
 import java.util.Date
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
 
-import org.phasanix.dbshim
-import org.scalatest.{FunSuite, Matchers}
+import java.sql.Connection
 
-class BindResultSetTest extends FunSuite with Matchers {
+class BindResultSetTest extends AnyFunSuite with Matchers {
 
-  implicit val aBinder = JdbcBinder.create[BindResultSetTest.TestA]
+  implicit val aBinder: JdbcBinder[BindResultSetTest.TestA] = JdbcBinder.create[BindResultSetTest.TestA]
 
   test("resultset bind should generate case classes") {
-    implicit val conn = DbFixture.getConnection
+    implicit val conn: Connection = DbFixture.getConnection
     val xs = Db.autocloseQuery("select * from TEST.A order by 1")
       .map(aBinder.fromResultSet)
       .toSeq
 
     xs.length shouldBe 4
-    xs(0).weight shouldBe defined
-    xs(1).weight shouldBe None
+    xs(0).weight.isDefined shouldBe true
+    xs(1).weight.isDefined shouldBe false
   }
 
   test("resultset bind should generate tuples") {
-    implicit val conn = DbFixture.getConnection
+    implicit val conn: Connection = DbFixture.getConnection
     val tBinder = JdbcBinder.create[(Int, String, String, Option[Double])]
 
     val xs =  Db.autocloseQuery("select * from TEST.A order by 1")
@@ -58,8 +61,8 @@ class BindResultSetTest extends FunSuite with Matchers {
         .toSeq
 
     xs.length shouldBe 4
-    xs(0)._4 shouldBe defined
-    xs(1)._4 shouldBe None
+    xs(0)._4.isDefined shouldBe true
+    xs(1)._4.isDefined shouldBe false
   }
 
   test("bind tuple to PreparedStatement should work") {
