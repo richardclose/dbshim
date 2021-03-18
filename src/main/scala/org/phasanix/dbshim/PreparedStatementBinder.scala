@@ -9,6 +9,15 @@ class PreparedStatementBinder(val ps: PreparedStatement) {
 
   private var currentIndex: Int = 1
 
+  /**
+    * Reset position index
+    * @return self
+    */
+  def reset(): PreparedStatementBinder = {
+    currentIndex = 1
+    this
+  }
+
   /** Set the given value to the next parameter of the prepared statement */
   def set[A: BindPsParam](value: A): PreparedStatementBinder = {
     implicitly[BindPsParam[A]].bind(ps, currentIndex, value)

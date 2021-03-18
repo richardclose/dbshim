@@ -187,6 +187,13 @@ object Db {
   }
 
   /**
+    * Given resultset, return autoclosing resultset iterator
+    */
+  def asAutocloseIterator(rs: ResultSet, conn: Connection): Iterator[ResultSet] = {
+    new CloseableResultSetIterator(rs, new Closer(conn))
+  }
+
+  /**
     * Scalar result from a ResultSet, i.e. the value in the first column
     * of the first row.
     *
